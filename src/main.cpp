@@ -4,6 +4,7 @@
 #include "nvs_flash.h"
 #include "esp_netif.h"
 #include "webserver.h"
+#include "led_effects.h"
 #include "esp_log.h"
 
 #define WIFI_SSID      "LedWorm-Netz"

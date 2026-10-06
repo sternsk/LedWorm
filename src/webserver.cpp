@@ -14,19 +14,6 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 extern volatile float joystick_x;
 extern volatile int8_t input_direction_trigger;
 
-// Dein GET-Handler für den Webserver
-static esp_err_t get_index_handler(httpd_req_t *req) {
-    httpd_resp_set_type(req, "text/html");
-
-    // Berechne die Dateigröße anhand der Start- und End-Zeiger
-    size_t index_html_len = index_html_end - index_html_start;
-
-    // Sende die im Flash eingebettete HTML-Datei direkt an den Browser
-    httpd_resp_send(req, (const char *)index_html_start, index_html_len);
-    return ESP_OK;
-}
-
-
 // Beispielhafte Mock-Verwaltung von Spielern im Spiel
 void send_player_list_to_all(httpd_handle_t hd) {
     // Hier würde im echten Spiel deine globale Spielerliste ausgelesen werden
