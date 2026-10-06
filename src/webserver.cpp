@@ -10,6 +10,10 @@ static const char *TAG = "WEB_SERVER";
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 
+// Zugriff auf die Variablen aus der led_effects.cpp erlauben
+extern volatile float joystick_x;
+extern volatile int8_t input_direction_trigger;
+
 // Dein GET-Handler für den Webserver
 static esp_err_t get_index_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "text/html");
@@ -112,10 +116,12 @@ static esp_err_t ws_handler(httpd_req_t *req) {
             cJSON *type = cJSON_GetObjectItem(root, "type");
             if (type && strcmp(type->valuestring, "joystick") == 0) {
                 double x = cJSON_GetObjectItem(root, "x")->valuedouble;
+                // Joystick X-Wert an den LED-Task übergeben
                 double y = cJSON_GetObjectItem(root, "y")->valuedouble;
                 
                 // Hier Steuerungsdaten direkt an den Ledworm-Spieletask übergeben!
                 ESP_LOGD(TAG, "Joystick X: %.2f, Y: %.2f", x, y);
+                joystick_x = (float)x; 
 
             } else if (type && strcmp(type->valuestring, "add_player") == 0) {
                 ESP_LOGI(TAG, "Event: Neuer Spieler angefordert!");
