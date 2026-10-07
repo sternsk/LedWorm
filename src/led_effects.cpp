@@ -138,7 +138,7 @@ void led_comet_task(void *pvParameters) {
             fade_all_to_black(led_strip, 30);
             
             // 2b. Neuen Kopf berechnen (Wert "63" entspricht deiner gedrosselten FastLED-Helligkeit)
-            rgb_pixel_t head_color = hsv_to_rgb(hue, saturation, 63);
+            rgb_pixel_t head_color = hsv_to_rgb(hue, saturation, 7);
             
             // 2c. Kopf in den Framebuffer und in den Treiber schreiben
             frame_buffer[currentLED] = head_color;
