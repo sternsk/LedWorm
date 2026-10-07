@@ -57,7 +57,8 @@ void init_wifi_softap(void) {
     wifi_config.ap.channel = 1;
     wifi_config.ap.max_connection = MAX_STA_CONN;
     // Wenn kein Passwort gewünscht ist, zu WIFI_AUTH_OPEN wechseln
-    wifi_config.ap.authmode = WIFI_AUTH_WPA2_PSK; 
+    // wifi_config.ap.authmode = WIFI_AUTH_WPA2_PSK; 
+    wifi_config.ap.authmode = WIFI_AUTH_OPEN;
 
     if (strlen(WIFI_PASS) == 0) {
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
