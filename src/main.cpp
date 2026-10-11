@@ -7,7 +7,7 @@
 #include "led_effects.h"
 #include "esp_log.h"
 
-#define WIFI_SSID      "LedWorm-Netz"
+#define WIFI_SSID      "LedWorm"
 #define WIFI_PASS      "ledworm123"
 #define MAX_STA_CONN   4
 
@@ -90,10 +90,10 @@ extern "C" void app_main(void) {
     // 3. Webserver aus dem letzten Schritt starten
     httpd_handle_t server = start_webserver();
 
-    // 4. Deinen FastLED Kometen/Wurm-Animationstask auf Core 1 starten
+    // 4. starte den render-task auf Core 1
     xTaskCreatePinnedToCore(
-        led_comet_task,   // Kommt aus der vorherigen Konversation
-        "led_worm_task", 
+        led_render_task,   
+        "led_render_task", 
         4096,             
         NULL,             
         5,                

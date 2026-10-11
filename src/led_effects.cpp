@@ -1,6 +1,7 @@
 // led_effects.cpp
 #include <stdio.h>
 #include "led_effects.h"
+#include "joystick.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "led_strip.h" 
@@ -19,10 +20,6 @@ typedef struct {
 
 // Lokaler Framebuffer, um Pixelwerte für den Schweif-Effekt (Fade) auszulesen
 static rgb_pixel_t frame_buffer[PIXEL_COUNT];
-
-// Globale, volatile Variablen zur Kommunikation zwischen Wi-Fi (Core 0) und LED (Core 1)
-volatile float joystick_x = 0.0f;
-volatile int8_t input_direction_trigger = 0; 
 
 /**
  * Hilfsfunktion: Konvertiert HSV-Farbraum in RGB-Farbraum ohne Fließkommazahlen.
@@ -100,7 +97,7 @@ void setupLEDs() {
 }
 
 // Der FreeRTOS Task
-void led_comet_task(void *pvParameters) {
+void led_render_task(void *pvParameters) {
     // === SETUP BEREICH ===
     setupLEDs();
 
@@ -108,37 +105,40 @@ void led_comet_task(void *pvParameters) {
     uint8_t currentLED = 0;
     uint8_t hue = 0;
     uint8_t saturation = 0;
+    uint8_t value = 7;
     int8_t direction = 1; 
+    int64_t lastUpdate = esp_timer_get_time(); 
+    const int64_t intervalUs = 16667;                   
 
-    uint64_t lastUpdate = esp_timer_get_time() / 1000; 
-    const uint64_t interval = 100;                     
-
-    // === LOOP BEREICH (Endlosschleife) ===
+    // === LOOP BEREICH ===
     while (1) {
-        
-        // 1. INPUT-PRÜFUNG
-        if (input_direction_trigger != 0) {
-            input_direction_trigger = 0; 
-            direction = -direction; 
-            ESP_LOGI(LED_TAG, "Richtung gewechselt! Saturation: %u", saturation);
-        }
 
-        if (joystick_x < -0.5f && direction == 1) {
+        // Joystickwerte lokal einlesen
+        const float x = joystick_x.load(std::memory_order_relaxed);
+        const float y = joystick_y.load(std::memory_order_relaxed);
+
+        if (x < -0.5f && direction == 1) {
             direction = -1;
-        } else if (joystick_x > 0.5f && direction == -1) {
+        } else if (x > 0.5f && direction == -1) {
             direction = 1;
         }
 
-        // 2. LED-ANIMATION (Alle 100ms)
-        uint64_t currentMillis = esp_timer_get_time() / 1000;
-        if (currentMillis - lastUpdate >= interval) {
-            lastUpdate = currentMillis; 
+        if (y < -0.5f){
+            value--;
+        }else if (y > .5f){
+            value++;
+        }
+
+        // 2. LED-ANIMATION (Ziel: ca. 60 FPS)
+        const int64_t now = esp_timer_get_time();
+        if (now - lastUpdate >= intervalUs) {
+            lastUpdate = now;
             
             // 2a. Schweif-Effekt anwenden (Dimmt den Framebuffer und pusht an led_strip)
             fade_all_to_black(led_strip, 30);
             
             // 2b. Neuen Kopf berechnen (Wert "63" entspricht deiner gedrosselten FastLED-Helligkeit)
-            rgb_pixel_t head_color = hsv_to_rgb(hue, saturation, 7);
+            rgb_pixel_t head_color = hsv_to_rgb(hue, saturation, value);
             
             // 2c. Kopf in den Framebuffer und in den Treiber schreiben
             frame_buffer[currentLED] = head_color;
@@ -160,7 +160,6 @@ void led_comet_task(void *pvParameters) {
             saturation += 1;
         }
 
-        // 3. ENTLASTUNG FÜR DAS SYSTEM
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }

@@ -1,4 +1,6 @@
 #pragma once
 
-extern volatile float joystick_x;
-extern volatile float joystick_y;
+#include <atomic>
+
+extern std::atomic<float> joystick_x;
+extern std::atomic<float> joystick_y;

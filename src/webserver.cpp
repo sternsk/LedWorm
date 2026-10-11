@@ -1,5 +1,6 @@
 //webserver.cpp
 #include "webserver.h"
+#include "joystick.h"
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
@@ -10,9 +11,9 @@ static const char *TAG = "WEB_SERVER";
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 
-// Zugriff auf die Variablen aus der led_effects.cpp erlauben
-extern volatile float joystick_x;
-extern volatile int8_t input_direction_trigger;
+std::atomic<float> joystick_x{0.0f};
+std::atomic<float> joystick_y{0.0f};
+
 
 // Beispielhafte Mock-Verwaltung von Spielern im Spiel
 void send_player_list_to_all(httpd_handle_t hd) {
@@ -102,13 +103,17 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         if (root) {
             cJSON *type = cJSON_GetObjectItem(root, "type");
             if (type && strcmp(type->valuestring, "joystick") == 0) {
-                double x = cJSON_GetObjectItem(root, "x")->valuedouble;
                 // Joystick X-Wert an den LED-Task übergeben
+                double x = cJSON_GetObjectItem(root, "x")->valuedouble;
                 double y = cJSON_GetObjectItem(root, "y")->valuedouble;
                 
                 // Hier Steuerungsdaten direkt an den Ledworm-Spieletask übergeben!
                 ESP_LOGD(TAG, "Joystick X: %.2f, Y: %.2f", x, y);
-                joystick_x = (float)x; 
+                joystick_x.store(static_cast<float>(x),
+                    std::memory_order_relaxed);
+
+                joystick_y.store(static_cast<float>(y),
+                    std::memory_order_relaxed);    
 
             } else if (type && strcmp(type->valuestring, "add_player") == 0) {
                 ESP_LOGI(TAG, "Event: Neuer Spieler angefordert!");
