@@ -108,7 +108,7 @@ void led_render_task(void *pvParameters) {
     uint8_t value = 7;
     int8_t direction = 1; 
     int64_t lastUpdate = esp_timer_get_time(); 
-    const int64_t intervalUs = 16667;                   
+    const int64_t intervalUs = 100000;//16667;                   
 
     // === LOOP BEREICH ===
     while (1) {
