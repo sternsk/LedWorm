@@ -108,10 +108,16 @@ void led_render_task(void *pvParameters) {
     uint8_t value = 7;
     int8_t direction = 1; 
     int64_t lastUpdate = esp_timer_get_time(); 
-    const int64_t intervalUs = 100000;//16667;                   
+    const int64_t intervalUs = 100 * 1000; // 100ms //16667 für 60Hz;    
+    
+    static float exact_value = 63.0f; //brightness startwert
+    static uint64_t last_time = 0;
 
     // === LOOP BEREICH ===
     while (1) {
+        static uint64_t last_brightness_update = 0;
+        uint64_t now = esp_timer_get_time(); // Aktuelle Zeit in us
+        if (last_time == 0) last_time = now;
 
         // Joystickwerte lokal einlesen
         const float x = joystick_x.load(std::memory_order_relaxed);
@@ -123,14 +129,25 @@ void led_render_task(void *pvParameters) {
             direction = 1;
         }
 
-        if (y < -0.5f){
-            value--;
-        }else if (y > .5f){
-            value++;
+
+        // Nur alle 50ms eine Änderung erlauben
+        if (now - last_brightness_update >= 50 * 1000) {
+            if (y < -0.5f){
+                if(value > 0){
+                    value--;
+                    last_brightness_update = now;
+                }
+                ESP_LOGI("Render","value: %u", value);
+            }else if (y > .5f){
+                if(value < 255){
+                    value++;
+                    last_brightness_update = now;
+                }
+                ESP_LOGI("Render","value: %u", value);
+            }
         }
 
         // 2. LED-ANIMATION (Ziel: ca. 60 FPS)
-        const int64_t now = esp_timer_get_time();
         if (now - lastUpdate >= intervalUs) {
             lastUpdate = now;
             

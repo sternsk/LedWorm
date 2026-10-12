@@ -108,10 +108,12 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                 double y = cJSON_GetObjectItem(root, "y")->valuedouble;
                 
                 // Hier Steuerungsdaten direkt an den Ledworm-Spieletask übergeben!
-                ESP_LOGD(TAG, "Joystick X: %.2f, Y: %.2f", x, y);
-                joystick_x.store(static_cast<float>(x),
-                    std::memory_order_relaxed);
+                ESP_LOGD("DEBUG", "Joystick x: %.2f, Y: %.2f", x, y);
+                ESP_LOGI("INFO", "Joystick x: %.2f, Y: %.2f", x, y);
 
+                joystick_x.store(static_cast<float>(x),
+                std::memory_order_relaxed);
+                
                 joystick_y.store(static_cast<float>(y),
                     std::memory_order_relaxed);    
 
