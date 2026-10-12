@@ -102,16 +102,18 @@ void led_render_task(void *pvParameters) {
     setupLEDs();
 
     // Lokale Statusvariablen
+    bool automotion = true;
     uint8_t currentLED = 0;
+    static float exact_position = 0.0f;
     uint8_t hue = 0;
     uint8_t saturation = 0;
     uint8_t value = 7;
+    static float brightness_value = 63.0f; //brightness startwert
     int8_t direction = 1; 
     uint64_t lastUpdate = esp_timer_get_time();
     const int64_t intervalUs = 100 * 1000; // 100ms //16667 für 60Hz;    
-    
-    static float exact_value = 63.0f; //brightness startwert
     static uint64_t last_time = 0;
+    static uint64_t last_motion = 0;
 
     // === LOOP BEREICH ===
     while (1) {
@@ -124,33 +126,46 @@ void led_render_task(void *pvParameters) {
         uint64_t now = esp_timer_get_time(); // Aktuelle Zeit in us
         if (last_time == 0) last_time = now;
         float dt = (now - last_time) / (1000 * 1000.0f); // Delta-Zeit in Sekunden (z. B. 0.005s bei 5ms Delay)
+        // Maximale Änderungsgeschwindigkeit: stufen pro Sekunde bei vollem Ausschlag
+        const float MAX_SPEED_PER_SEC = 50.0f; 
         last_time = now;
 
         // Deadzone prüfen: Reagiere erst, wenn der Joystick spürbar bewegt wird (Rauschen eliminieren)
         if (y > .2f || y < -.2f) {
-            // Maximale Änderungsgeschwindigkeit: z. B. 50 Helligkeitsstufen pro Sekunde bei vollem Ausschlag
-            const float MAX_SPEED_PER_SEC = 50.0f; 
 
             // Änderung = Geschwindigkeit * Joystick-Ausschlag * Delta-Zeit
-            exact_value += MAX_SPEED_PER_SEC * y * dt;
+            brightness_value += MAX_SPEED_PER_SEC * y * dt;
 
             // Grenzen hart limitieren (0 bis 255), damit der Wert nicht wegläuft
-            if (exact_value > 255.0f) exact_value = 255.0f;
-            if (exact_value < 0.0f)   exact_value = 0.0f;
+            if (brightness_value > 255.0f) brightness_value = 255.0f;
+            if (brightness_value < 0.0f)   brightness_value = 0.0f;
 
-            uint8_t new_value = static_cast<uint8_t>(exact_value);
+            uint8_t new_value = static_cast<uint8_t>(brightness_value);
 
             // Nur loggen, wenn sich die Ganzzahl tatsächlich geändert hat
             if (new_value != value) {
                 value = new_value;
-                ESP_LOGI("Render", "value proportional: %u", value);
+                ESP_LOGD("render_task", "value: %u", value);
             }
         }
 
-        if (x < -0.5f && direction == 1) {
-            direction = -1;
-        } else if (x > 0.5f && direction == -1) {
-            direction = 1;
+        if (x < -0.2f || x > .2f) {
+            automotion = false;
+            last_motion = now;
+
+            exact_position += 10 * x * dt;
+            
+            if (exact_position < 0.0f) exact_position = 0.0f;
+            if (exact_position >= PIXEL_COUNT) exact_position = PIXEL_COUNT - 1;
+            
+            ESP_LOGI("render_task", "exact_position: %.2f", exact_position);
+
+            // 3. In eine Ganzzahl für die LEDs umwandeln (Kaufmännisches Runden mit +0.5f für weichere Übergänge)
+            uint8_t newCurrentLED = static_cast<uint8_t>(exact_position + .5f);
+
+            if(newCurrentLED != currentLED){
+                currentLED = newCurrentLED;
+            }
         }
 
         // 2. LED-ANIMATION (Ziel: ca. 60 FPS)
@@ -178,7 +193,8 @@ void led_render_task(void *pvParameters) {
             }
 
             // Werte inkrementieren
-            currentLED += direction;
+            if(now - last_motion > 3 * 1000 * 1000) automotion = true; // keine Bewegung - animation startet nach einer sekunde
+            if(automotion) currentLED += direction;
             hue += 8;
             saturation += 1;
         }
