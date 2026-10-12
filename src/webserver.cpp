@@ -109,7 +109,6 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                 
                 // Hier Steuerungsdaten direkt an den Ledworm-Spieletask übergeben!
                 ESP_LOGD("DEBUG", "Joystick x: %.2f, Y: %.2f", x, y);
-                ESP_LOGI("INFO", "Joystick x: %.2f, Y: %.2f", x, y);
 
                 joystick_x.store(static_cast<float>(x),
                 std::memory_order_relaxed);

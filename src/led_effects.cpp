@@ -107,7 +107,7 @@ void led_render_task(void *pvParameters) {
     uint8_t saturation = 0;
     uint8_t value = 7;
     int8_t direction = 1; 
-    int64_t lastUpdate = esp_timer_get_time(); 
+    uint64_t lastUpdate = esp_timer_get_time();
     const int64_t intervalUs = 100 * 1000; // 100ms //16667 für 60Hz;    
     
     static float exact_value = 63.0f; //brightness startwert
@@ -116,35 +116,41 @@ void led_render_task(void *pvParameters) {
     // === LOOP BEREICH ===
     while (1) {
         static uint64_t last_brightness_update = 0;
-        uint64_t now = esp_timer_get_time(); // Aktuelle Zeit in us
-        if (last_time == 0) last_time = now;
-
+        
         // Joystickwerte lokal einlesen
         const float x = joystick_x.load(std::memory_order_relaxed);
         const float y = joystick_y.load(std::memory_order_relaxed);
+
+        uint64_t now = esp_timer_get_time(); // Aktuelle Zeit in us
+        if (last_time == 0) last_time = now;
+        float dt = (now - last_time) / (1000 * 1000.0f); // Delta-Zeit in Sekunden (z. B. 0.005s bei 5ms Delay)
+        last_time = now;
+
+        // Deadzone prüfen: Reagiere erst, wenn der Joystick spürbar bewegt wird (Rauschen eliminieren)
+        if (y > .2f || y < -.2f) {
+            // Maximale Änderungsgeschwindigkeit: z. B. 50 Helligkeitsstufen pro Sekunde bei vollem Ausschlag
+            const float MAX_SPEED_PER_SEC = 50.0f; 
+
+            // Änderung = Geschwindigkeit * Joystick-Ausschlag * Delta-Zeit
+            exact_value += MAX_SPEED_PER_SEC * y * dt;
+
+            // Grenzen hart limitieren (0 bis 255), damit der Wert nicht wegläuft
+            if (exact_value > 255.0f) exact_value = 255.0f;
+            if (exact_value < 0.0f)   exact_value = 0.0f;
+
+            uint8_t new_value = static_cast<uint8_t>(exact_value);
+
+            // Nur loggen, wenn sich die Ganzzahl tatsächlich geändert hat
+            if (new_value != value) {
+                value = new_value;
+                ESP_LOGI("Render", "value proportional: %u", value);
+            }
+        }
 
         if (x < -0.5f && direction == 1) {
             direction = -1;
         } else if (x > 0.5f && direction == -1) {
             direction = 1;
-        }
-
-
-        // Nur alle 50ms eine Änderung erlauben
-        if (now - last_brightness_update >= 50 * 1000) {
-            if (y < -0.5f){
-                if(value > 0){
-                    value--;
-                    last_brightness_update = now;
-                }
-                ESP_LOGI("Render","value: %u", value);
-            }else if (y > .5f){
-                if(value < 255){
-                    value++;
-                    last_brightness_update = now;
-                }
-                ESP_LOGI("Render","value: %u", value);
-            }
         }
 
         // 2. LED-ANIMATION (Ziel: ca. 60 FPS)
