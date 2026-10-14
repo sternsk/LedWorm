@@ -5,6 +5,7 @@
 .vscode/launch.json
 .vscode/ipch
 managed_components
+sdkconfig.LedWorm
 CMakeLists.txt
 !src/CMakeLists.txt
 dependencies.lock
