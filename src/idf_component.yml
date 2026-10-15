@@ -1,3 +1,5 @@
 dependencies:
   espressif/led_strip:
     version: "*"
+  espressif/cjson:
+    version: "*"
