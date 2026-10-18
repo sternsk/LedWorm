@@ -14,6 +14,10 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 std::atomic<float> joystick_x{0.0f};
 std::atomic<float> joystick_y{0.0f};
 
+volatile uint8_t ambient_r = 0;
+volatile uint8_t ambient_g = 0;
+volatile uint8_t ambient_b = 0;
+
 
 // Beispielhafte Mock-Verwaltung von Spielern im Spiel
 void send_player_list_to_all(httpd_handle_t hd) {

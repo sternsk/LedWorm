@@ -5,8 +5,8 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "led_strip.h" 
-#define LED_PIN     7
-#define PIXEL_COUNT 256
+#define LED_PIN     256
+#define PIXEL_COUNT 18
 
 static const char *LED_TAG = "LED_TASK";
 static led_strip_handle_t led_strip;
