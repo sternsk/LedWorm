@@ -178,10 +178,54 @@ httpd_handle_t start_webserver(void) {
             .is_websocket = true
         };
         httpd_register_uri_handler(server, &ws_uri);
+
+        httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+        max_open_sockets = config.max_open_sockets;
         
         return server;
     }
 
     ESP_LOGI(TAG, "Fehler beim Starten des Servers.");
     return NULL;
+}
+
+// Maximale Anzahl der HTTP-Sessions merken
+static size_t max_open_sockets = 0;
+
+// Anzahl aktuell verbundener WebSocket-Clients ermitteln
+size_t get_websocket_client_count(httpd_handle_t server)
+{
+    if (server == NULL || max_open_sockets == 0) {
+        return 0;
+    }
+
+    int *client_fds = static_cast<int *>(
+        calloc(max_open_sockets, sizeof(int))
+    );
+
+    if (client_fds == NULL) {
+        return 0;
+    }
+
+    size_t count = max_open_sockets;
+
+    esp_err_t ret = httpd_get_client_list(
+        server, &count, client_fds
+    );
+
+    size_t ws_count = 0;
+
+    if (ret == ESP_OK) {
+        for (size_t i = 0; i < count; i++) {
+            if (httpd_ws_get_fd_info(server, client_fds[i])
+                    == HTTPD_WS_CLIENT_WEBSOCKET) {
+                ws_count++;
+            }
+        }
+    } else {
+        ESP_LOGE(TAG, "Client-Liste konnte nicht gelesen werden");
+    }
+
+    free(client_fds);
+    return ws_count;
 }
