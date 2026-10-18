@@ -1,6 +1,6 @@
 //webserver.cpp
 #include "webserver.h"
-#include "joystick.h"
+#include "globals.h"
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
@@ -120,6 +120,26 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                 ESP_LOGI(TAG, "Event: Neuer Spieler angefordert!");
                 // Spiellogik triggern: z.B. einen neuen Wurm auf dem LED-Streifen spawnen
                 send_player_list_to_all(req->handle);
+                
+            } else if (type && strcmp(type->valuestring, "ambient_color") == 0) {
+                cJSON *hex_item = cJSON_GetObjectItemCaseSensitive(root, "hex");
+                
+                if (cJSON_IsString(hex_item) && (hex_item->valuestring != NULL)) {
+                    const char *hex = hex_item->valuestring;
+                    
+                    // Prüfen, ob der String das korrekte Format hat (z.B. "#ff00a0" = 7 Zeichen)
+                    if (hex[0] == '#' && strlen(hex) == 7) {
+                        unsigned int r, g, b;
+                        // sscanf liest die Hexadezimalwerte ab Zeichenposition 1 aus
+                        if (sscanf(&hex[1], "%02x%02x%02x", &r, &g, &b) == 3) {
+                            ambient_r = static_cast<uint8_t>(r);
+                            ambient_g = static_cast<uint8_t>(g);
+                            ambient_b = static_cast<uint8_t>(b);
+                            
+                            ESP_LOGI("SERVER", "Hintergrundbeleuchtung geändert auf R:%d G:%d B:%d", ambient_r, ambient_g, ambient_b);
+                        }
+                    }
+                }
             }
             cJSON_Delete(root);
         }

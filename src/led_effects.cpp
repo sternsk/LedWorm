@@ -1,12 +1,12 @@
 // led_effects.cpp
 #include <stdio.h>
 #include "led_effects.h"
-#include "joystick.h"
+#include "globals.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "led_strip.h" 
 #define LED_PIN     7
-#define PIXEL_COUNT 18
+#define PIXEL_COUNT 256
 
 static const char *LED_TAG = "LED_TASK";
 static led_strip_handle_t led_strip;
@@ -51,14 +51,25 @@ static rgb_pixel_t hsv_to_rgb(uint8_t h, uint8_t s, uint8_t v) {
 /**
  * Hilfsfunktion: Simuliert FastLEDs fadeToBlackBy für den led_strip
  */
-static void fade_all_to_black(led_strip_handle_t strip, uint8_t fade_factor) {
+static void fade_to_ambient(led_strip_handle_t strip, uint8_t fade_factor) {
     uint16_t keep_amount = 255 - fade_factor;
 
     for (int i = 0; i < PIXEL_COUNT; i++) {
         // Werte im Framebuffer abdunkeln
-        frame_buffer[i].r = (frame_buffer[i].r * keep_amount) >> 8;
-        frame_buffer[i].g = (frame_buffer[i].g * keep_amount) >> 8;
-        frame_buffer[i].b = (frame_buffer[i].b * keep_amount) >> 8;
+        uint8_t faded_r = frame_buffer[i].r = (frame_buffer[i].r * keep_amount) >> 8;
+        uint8_t faded_g = frame_buffer[i].g = (frame_buffer[i].g * keep_amount) >> 8;
+        uint8_t faded_b = frame_buffer[i].b = (frame_buffer[i].b * keep_amount) >> 8;
+
+        // 2. Berechne den Anteil der Hintergrundbeleuchtung, der dazukommen soll
+        // (Damit die Hintergrundfarbe leuchtet, wenn kein Wurm da ist)
+        uint8_t bg_r = (ambient_r * fade_factor) >> 8;
+        uint8_t bg_g = (ambient_g * fade_factor) >> 8;
+        uint8_t bg_b = (ambient_b * fade_factor) >> 8;
+
+        // 3. Zusammenführen und im Puffer sichern
+        frame_buffer[i].r = faded_r + bg_r;
+        frame_buffer[i].g = faded_g + bg_g;
+        frame_buffer[i].b = faded_b + bg_b;
 
         // An den Hardware-Treiber übergeben
         led_strip_set_pixel(strip, i, frame_buffer[i].r, frame_buffer[i].g, frame_buffer[i].b);
@@ -174,7 +185,7 @@ void led_render_task(void *pvParameters) {
             lastUpdate = now;
             
             // 2a. Schweif-Effekt anwenden (Dimmt den Framebuffer und pusht an led_strip)
-            fade_all_to_black(led_strip, 30);
+            fade_to_ambient(led_strip, 30);
             
             // 2b. Neuen Kopf berechnen (Wert "63" entspricht deiner gedrosselten FastLED-Helligkeit)
             rgb_pixel_t head_color = hsv_to_rgb(hue, saturation, value);

@@ -49,6 +49,13 @@
             </div>
             <button id="btn-join">Join</button>
         </div>
+        <div class="join-box">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                <span>Hintergrundfarbe:</span>
+                <!-- HTML5 Farbauswahlfeld -->
+                <input type="color" id="ambient-color-input" value="#000000" style="width: 80px; height: 40px; border: none; cursor: pointer;">
+            </div>
+        </div>
     </div>
 
     <div class="bottom-controls">
@@ -112,7 +119,7 @@
             }
         });
 
-        // Joystick Logik (unverändert funktional, nur visuell verschoben)
+        // Joystick Logik 
         zone.addEventListener('touchstart', startMove, {passive: false});
         window.addEventListener('touchend', endMove);
         window.addEventListener('touchmove', move, {passive: false});
@@ -179,6 +186,20 @@
                 ws.send(JSON.stringify({ type: "joystick", x: parseFloat(x), y: parseFloat(y) }));
             }
         }
+
+        const ambientColorInput = document.getElementById('ambient-color-input');
+
+        // Reagiert, wenn der Benutzer die Farbe im Auswahlfeld ändert
+        ambientColorInput.addEventListener('input', (e) => {
+            const hexColor = e.target.value; // Liefert einen String wie "#ff0000"
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "ambient_color",
+                    hex: hexColor
+                }));
+            }
+        });
 
         window.onload = initWebSocket;
     </script>
