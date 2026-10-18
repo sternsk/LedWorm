@@ -12,6 +12,9 @@
     uint16_t length = 6;
     int8_t orientation = 1;
 
+    float x_position = .0f;
+    float y_position = .0f;
+
     bool active = false;
 
 void init(uint8_t playerId, const char* playerName) {

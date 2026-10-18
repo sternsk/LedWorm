@@ -16,9 +16,8 @@ public:
     float joystick_y;
 
     // Eigenschaften des LedWorms
-    uint16_t speed;
-    uint16_t length;
-    int8_t orientation;
+    float x_position;
+    float y_position;
 
     bool active;
 
