@@ -71,7 +71,7 @@
         </div>
         <!-- Ein vertikaler Schieberegler von 0 bis 255 -->
         <div class="slider-container">
-            <input type="range" id="brightness" min="0" max="255" value="128" orient="vertical">
+            <input type="range" id="value-slider" min="0" max="255" value="128" orient="vertical">
         </div>
     </div>
     
@@ -86,7 +86,7 @@
         const myIdVal = document.getElementById('my-id-val');
         const joinSection = document.getElementById('join-section');
         const ambientColorInput = document.getElementById('ambient-color-input');
-        const brightnessSlider = document.getElementById('brightness');
+        const valueSlider = document.getElementById('value-slider');
         
         let amIJoined = false;
         let active = false;
@@ -209,6 +209,17 @@
                 ws.send(JSON.stringify({
                     type: "ambient_color",
                     hex: hexColor
+                }));
+            }
+        });
+
+        valueSlider.addEventListener('input', (e) => {
+            const v = e.target.value;
+
+            if (ws && ws.readyState === WebSocket.OPEN){
+                ws.send(JSON.stringify({
+                    type: "value",
+                    int: v
                 }));
             }
         });

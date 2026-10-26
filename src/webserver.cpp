@@ -1,5 +1,6 @@
 //webserver.cpp
 #include "webserver.h"
+#include "player_manager.h"
 #include "globals.h"
 #include <stdio.h>
 #include <string.h>
@@ -72,11 +73,17 @@ static esp_err_t get_index_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// WebSocket Handler (WS /ws)
+// WebSocket Handler 
 static esp_err_t ws_handler(httpd_req_t *req) {
+    int client_fd = httpd_req_to_sockfd(req);
+
     if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "Handshake erfolgreich abgeschlossen.");
-        // Hier könnte man kurz verzögern und die initiale Spielerliste schicken
+        ESP_LOGI(TAG,
+                 "WebSocket-Handshake erfolgreich, fd=%d",
+                 client_fd);
+        // Hier sollte der ws-handler im player-manager schauen, welcher slot frei ist und diesem dann dem client zuweisen. 
+        // dabei sollten id und spielername aktualisiert werden
+
         return ESP_OK;
     }
 
@@ -107,24 +114,19 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         if (root) {
             cJSON *type = cJSON_GetObjectItem(root, "type");
             if (type && strcmp(type->valuestring, "joystick") == 0) {
-                // Joystick X-Wert an den LED-Task übergeben
+                // bisherige einfache Übergabe der Joystick-Werte an den render-task sollten 
+                // an die identifizierte LedWorm-Instanz gereicht werden.
                 double x = cJSON_GetObjectItem(root, "x")->valuedouble;
                 double y = cJSON_GetObjectItem(root, "y")->valuedouble;
-                
-                // Hier Steuerungsdaten direkt an den Ledworm-Spieletask übergeben!
-                ESP_LOGD("DEBUG", "Joystick x: %.2f, Y: %.2f", x, y);
-
                 joystick_x.store(static_cast<float>(x),
                 std::memory_order_relaxed);
                 
                 joystick_y.store(static_cast<float>(y),
                     std::memory_order_relaxed);    
-
-            } else if (type && strcmp(type->valuestring, "add_player") == 0) {
-                ESP_LOGI(TAG, "Event: Neuer Spieler angefordert!");
-                // Spiellogik triggern: z.B. einen neuen Wurm auf dem LED-Streifen spawnen
-                send_player_list_to_all(req->handle);
                 
+                // Hier Steuerungsdaten direkt an den Ledworm-Spieletask übergeben!
+                ESP_LOGD("DEBUG", "Joystick x: %.2f, Y: %.2f", x, y);
+
             } else if (type && strcmp(type->valuestring, "ambient_color") == 0) {
                 cJSON *hex_item = cJSON_GetObjectItemCaseSensitive(root, "hex");
                 
@@ -140,7 +142,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                             ambient_g = static_cast<uint8_t>(g);
                             ambient_b = static_cast<uint8_t>(b);
                             
-                            ESP_LOGI("SERVER", "Hintergrundbeleuchtung geändert auf R:%d G:%d B:%d", ambient_r, ambient_g, ambient_b);
+                            ESP_LOGD("SERVER", "Hintergrundbeleuchtung geändert auf R:%d G:%d B:%d", ambient_r, ambient_g, ambient_b);
                         }
                     }
                 }

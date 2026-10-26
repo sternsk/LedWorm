@@ -2,14 +2,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <string.h>
-
-constexpr size_t LEDWORM_NAME_LENGTH = 24;
 
 class LedWorm {
 public:
-    uint8_t id;  // Interne Spieler-ID
-    char name[LEDWORM_NAME_LENGTH];
 
     // Joystickzustand
     float joystick_x;
@@ -19,8 +14,18 @@ public:
     float x_position;
     float y_position;
 
+    uint8_t length;
     bool active;
 
-    void init(uint8_t playerId, const char* playerName);
+    // Konstruktor: sicherer Grundzustand
+    LedWorm()
+        : joystick_x(0.0f),
+          joystick_y(0.0f),
+          length(8),
+          active(false)
+    {
+    }
+
+    void init(uint8_t playerId);
     void setJoystick(float x, float y);
 };
