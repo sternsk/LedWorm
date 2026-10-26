@@ -52,7 +52,7 @@ bool addPlayer(int socketFd, const char* name)
                 nextPlayerId = 1;
             }
 
-            if (!worms[i].init(playerId, name)) {
+            if (!worms[i].init(playerId)) {
                 xSemaphoreGive(playerMutex);
                 return false;
             }

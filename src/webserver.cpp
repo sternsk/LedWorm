@@ -12,13 +12,8 @@ static const char *TAG = "WEB_SERVER";
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 
-std::atomic<float> joystick_x{0.0f};
-std::atomic<float> joystick_y{0.0f};
-
-volatile uint8_t ambient_r = 0;
-volatile uint8_t ambient_g = 0;
-volatile uint8_t ambient_b = 0;
-
+// Maximale Anzahl der HTTP-Sessions merken
+static size_t max_open_sockets = 0;
 
 // Beispielhafte Mock-Verwaltung von Spielern im Spiel
 void send_player_list_to_all(httpd_handle_t hd) {
@@ -82,7 +77,6 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                  "WebSocket-Handshake erfolgreich, fd=%d",
                  client_fd);
         // Hier sollte der ws-handler im player-manager schauen, welcher slot frei ist und diesem dann dem client zuweisen. 
-        // dabei sollten id und spielername aktualisiert werden
 
         return ESP_OK;
     }
@@ -154,6 +148,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+
 // Konfiguration des Servers
 httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
@@ -191,8 +186,6 @@ httpd_handle_t start_webserver(void) {
     return NULL;
 }
 
-// Maximale Anzahl der HTTP-Sessions merken
-static size_t max_open_sockets = 0;
 
 // Anzahl aktuell verbundener WebSocket-Clients ermitteln
 size_t get_websocket_client_count(httpd_handle_t server)

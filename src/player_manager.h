@@ -2,8 +2,7 @@
 
 #include <stdint.h>
 #include "ledworm.h"
-
-constexpr uint8_t MAX_PLAYERS = 8;
+#include "globals.h"
 
 struct player_t {
     int client_fd;          // WebSocket-Verbindung

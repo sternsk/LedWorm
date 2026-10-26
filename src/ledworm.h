@@ -26,6 +26,7 @@ public:
     {
     }
 
-    void init(uint8_t playerId);
+    bool init(uint8_t playerId);
     void setJoystick(float x, float y);
+    void deactivate();
 };

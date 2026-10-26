@@ -26,12 +26,96 @@
         .bottom-controls { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, #1a1a1a 20%); padding-bottom: 30px; display: flex; justify-content: center; z-index: 100; }
         #joystick-zone { width: 180px; height: 180px; background: rgba(51, 51, 51, 0.9); border-radius: 50%; position: relative; border: 3px solid #555; touch-action: none; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
         #joystick-stick { width: 54px; height: 54px; background: #00ffff; border-radius: 50%; position: absolute; top: 60px; left: 60px; box-shadow: 0 0 15px #00ffff; cursor: pointer; }
-        input[type=range][orient=vertical] {
-            writing-mode: vertical-lr; /* Richtet den Slider vertikal aus */
-            direction: rtl;            /* Sorgt dafür, dass "oben" das Maximum (255) ist */
-            width: 20px;
-            height: 150px;
-            padding: 0 5px;
+        
+        /*Creating a custom range slider with only CSS - https://blog.logrocket.com/creating-custom-css-range-slider-javascript-upgrades/ */
+        input[type="range"] {
+        /* removing default appearance */
+        -webkit-appearance: none;
+        appearance: none; 
+        /* creating a custom design */
+        cursor: pointer;
+        outline: none;
+        writing-mode: vertical-rl;
+        /*  slider progress trick  */
+        overflow: hidden;
+        border-radius: 16px;
+        }
+
+        /* Track: webkit browsers */
+        input[type="range"]::-webkit-slider-runnable-track {
+        height: 15px;
+        background: #555;
+        border-radius: 16px;
+        }
+
+        /* Track: Mozilla Firefox */
+        input[type="range"]::-moz-range-track {
+        height: 15px;
+        background: #555;
+        border-radius: 16px;
+        }
+
+        /* Thumb: webkit */
+        input[type="range"]::-webkit-slider-thumb {
+        /* removing default appearance */
+        -webkit-appearance: none;
+        appearance: none; 
+        /* creating a custom design */
+        height: 15px;
+        width: 18px;
+        background-color: #00ffff;
+        border-radius: 50%;
+        border: 2px solid #555;
+        /*  slider progress trick  */
+        box-shadow: -407px 0 0 400px #555;
+        }
+
+
+        /* Thumb: Firefox */
+        input[type="range"]::-moz-range-thumb {
+        height: 15px;
+        width: 15px;
+        background-color: #555;
+        border-radius: 50%;
+        border: 1px solid #555;
+        /*  slider progress trick  */
+        box-shadow: -407px 0 0 400px #00ffff;
+        }
+
+
+        /*=============
+        Aesthetics 
+        =========================*/
+
+        body {
+        font-family: system-ui;
+        }
+
+        h1 {
+        color: #4b4949; 
+        text-align: center;
+        }
+
+        .wrapper {
+        color: #4b4949; 
+        background: #00ffff;
+        max-width: 400px;
+        width: 100%;
+        height: 300px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0 auto;
+        }
+
+        .range {
+        display: flex;
+        align-items: center;
+        max-width: 500px;
+        height: 4rem;
+        width: 80%;
+        background: #555;
+        padding: 0px 10px;
         }
     </style>
 </head>
@@ -71,7 +155,7 @@
         </div>
         <!-- Ein vertikaler Schieberegler von 0 bis 255 -->
         <div class="slider-container">
-            <input type="range" id="value-slider" min="0" max="255" value="128" orient="vertical">
+            <input type="range" id="value-slider" min="0" max="255" value="128">
         </div>
     </div>
     

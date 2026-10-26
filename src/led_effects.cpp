@@ -5,8 +5,7 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "led_strip.h" 
-#define LED_PIN     7
-#define PIXEL_COUNT 256
+
 
 static const char *LED_TAG = "LED_TASK";
 static led_strip_handle_t led_strip;
@@ -128,11 +127,9 @@ void led_render_task(void *pvParameters) {
     
     // === LOOP BEREICH ===
     while (1) {
-        static uint64_t last_brightness_update = 0;
+        //static uint64_t last_brightness_update = 0;
         
         // Joystickwerte lokal einlesen
-        const float x = joystick_x.load(std::memory_order_relaxed);
-        const float y = joystick_y.load(std::memory_order_relaxed);
         
         uint64_t now = esp_timer_get_time(); // Aktuelle Zeit in us
         if (last_time == 0) last_time = now;
