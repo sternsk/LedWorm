@@ -77,7 +77,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                  "WebSocket-Handshake erfolgreich, fd=%d",
                  client_fd);
         // Hier sollte der ws-handler im player-manager schauen, welcher slot frei ist und diesem dann dem client zuweisen. 
-
+        addPlayer(client_fd);
         return ESP_OK;
     }
 
@@ -108,26 +108,33 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         if (root) {
             cJSON *type = cJSON_GetObjectItem(root, "type");
             if (type && strcmp(type->valuestring, "joystick") == 0) {
-                // bisherige einfache Übergabe der Joystick-Werte an den render-task sollten 
-                // an die identifizierte LedWorm-Instanz gereicht werden.
-                double x = cJSON_GetObjectItem(root, "x")->valuedouble;
-                double y = cJSON_GetObjectItem(root, "y")->valuedouble;
-                joystick_x.store(static_cast<float>(x),
-                std::memory_order_relaxed);
-                
-                joystick_y.store(static_cast<float>(y),
-                    std::memory_order_relaxed);    
+                // Übergabe der Joystick-Werte an die identifizierte LedWorm-Instanz
+                cJSON *x_item = cJSON_GetObjectItem(root, "x");
+                cJSON *y_item = cJSON_GetObjectItem(root, "y");
+
+                if (cJSON_IsNumber(x_item) &&
+                    cJSON_IsNumber(y_item)) {
+                        float x = static_cast<float>(x_item->valuedouble);
+                        float y = static_cast<float>(y_item->valuedouble);
+
+                // Joystickdaten dem richtigen Spieler zuordnen
+                if (!updateJoystick(client_fd, x, y)) {
+                    ESP_LOGW(TAG,
+                            "Kein aktiver Spieler für fd=%d",
+                            client_fd);
+                }
                 
                 // Hier Steuerungsdaten direkt an den Ledworm-Spieletask übergeben!
-                ESP_LOGD("DEBUG", "Joystick x: %.2f, Y: %.2f", x, y);
-
+                ESP_LOGD(TAG, "Joystick fd=%d: %.2f, Y: %.2f", client_fd, x, y);
+            }
+                
             } else if (type && strcmp(type->valuestring, "ambient_color") == 0) {
                 cJSON *hex_item = cJSON_GetObjectItemCaseSensitive(root, "hex");
                 
                 if (cJSON_IsString(hex_item) && (hex_item->valuestring != NULL)) {
                     const char *hex = hex_item->valuestring;
                     
-                    // Prüfen, ob der String das korrekte Format hat (z.B. "#ff00a0" = 7 Zeichen)
+                    // Prüfen, ob der String das korrekte Format hat (z.B. "#2ba16a" = 7 Zeichen)
                     if (hex[0] == '#' && strlen(hex) == 7) {
                         unsigned int r, g, b;
                         // sscanf liest die Hexadezimalwerte ab Zeichenposition 1 aus
