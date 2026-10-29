@@ -5,6 +5,7 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "led_strip.h" 
+#include "player_manager.h"
 
 
 static const char *LED_TAG = "LED_TASK";
@@ -106,7 +107,6 @@ void setupLEDs() {
     ESP_LOGI(LED_TAG, "AlphaRail Native LED-strip Task initialisiert");
 }
 
-// Der FreeRTOS Task
 void led_render_task(void *pvParameters) {
     // === SETUP BEREICH ===
     setupLEDs();

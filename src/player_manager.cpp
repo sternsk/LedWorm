@@ -118,23 +118,11 @@ bool updateJoystick(int socketFd, float x, float y)
         return false;
     }
 
-    uint32_t player_id;
-
-    if (!findPlayerId(socketFd, player_id)) {
-        return false;
-    }
-
     // Ungültige oder außerhalb des erwarteten Bereichs liegende Werte ablehnen
     if (x < -1.0f || x > 1.0f ||
         y < -1.0f || y > 1.0f) {
         return false;
     }
-
-    joystick_event_t event = {
-        .player_id = player_id,
-        .x = x,
-        .y = y
-    };
 
     if (playerMutex == nullptr ||
         xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) {

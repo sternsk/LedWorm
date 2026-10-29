@@ -120,12 +120,9 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                 // Joystickdaten dem richtigen Spieler zuordnen
                 if (!updateJoystick(client_fd, x, y)) {
                     ESP_LOGW(TAG,
-                            "Kein aktiver Spieler für fd=%d",
-                            client_fd);
+                            "Kein Joystick-update für fd=%d, x: %.2f, y: %.2f",
+                            client_fd, x, y);
                 }
-                
-                // Hier Steuerungsdaten direkt an den Ledworm-Spieletask übergeben!
-                ESP_LOGD(TAG, "Joystick fd=%d: %.2f, Y: %.2f", client_fd, x, y);
             }
                 
             } else if (type && strcmp(type->valuestring, "ambient_color") == 0) {
