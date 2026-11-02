@@ -1,53 +1,45 @@
 #include "ledworm.h"
-#include "esp_timer.h"
+#include "globals.h"
+#include <algorithm>
+#include <cmath>
 
-// Joystickzustand
-float worm_joystick_x;
-float worm_joystick_y;
-
-uint8_t length;
-const char* playerName;
-
-float x_position = .0f;
-float y_position = .0f;
-uint64_t last_move_time = 0;
-
-bool active = false;
-
-bool init(uint8_t playerId) {
-    worm_joystick_x = 0.0f;
-    worm_joystick_y = 0.0f;
-    x_position = 12;
-    y_position = 8;
-    active = true;
-    return true;
+bool LedWorm::init(uint32_t playerId) {
+    joystick_x = 0.0f;
+    joystick_y = 0.0f;
+    x_position = 0.0f;
+    y_position = 0.0f;
+    last_move_time = 0;
+    clock_started = false;
+    active = playerId != 0;
+    return active;
 }
 
-bool LedWorm::move(float joystick_x, float joystick_y, uint64_t now)
-{
-    if (last_move_time == 0) {
-        last_move_time = now;
+bool LedWorm::move(float x, float y, uint64_t now) {
+    if (!active || !std::isfinite(x) || !std::isfinite(y)) {
         return false;
     }
-
-    float dt = (now - last_move_time) / 1000*1000.0f;
+    if (!clock_started || now < last_move_time) {
+        last_move_time = now;
+        clock_started = true;
+        return false;
+    }
+    // esp_timer_get_time() liefert Mikrosekunden. Keine Sprünge nach Pausen.
+    const float dt = std::min((now - last_move_time) / 1000000.0f, 0.1f);
     last_move_time = now;
-
-    // Horizontale Joystick-Achse steuert die Bewegung.
-    float x_movement = nominal_speed * joystick_x * dt;
-    float y_movement = nominal_speed * joystick_y * dt;
-
-    x_position += x_movement;
-    y_position += y_movement;
-
+    x_position = std::max(0.0f, std::min(float(MATRIX_WIDTH - 1),
+        x_position + nominal_speed * x * dt));
+    y_position = std::max(0.0f, std::min(float(MATRIX_HEIGHT - 1),
+        y_position + nominal_speed * y * dt));
     return true;
 }
 
-void setJoystick(float x, float y) {
-    worm_joystick_x = x;
-    worm_joystick_y = y;
+void LedWorm::setJoystick(float x, float y) {
+    joystick_x = x;
+    joystick_y = y;
 }
 
-void deactivate(){
+void LedWorm::deactivate() {
     active = false;
+    joystick_x = joystick_y = 0.0f;
+    clock_started = false;
 }

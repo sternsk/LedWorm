@@ -11,3 +11,5 @@ CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
 # Secondary Console optional deaktivieren
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+# Acht Spieler-WebSockets, Controller-HTTP und interne Server-Sockets
+CONFIG_LWIP_MAX_SOCKETS=16

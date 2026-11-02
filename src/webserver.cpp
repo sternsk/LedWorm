@@ -4,6 +4,8 @@
 #include "globals.h"
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <cstdlib>
 #include "esp_log.h"
 #include "cJSON.h" // JSON Parsing
 
@@ -76,9 +78,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         ESP_LOGI(TAG,
                  "WebSocket-Handshake erfolgreich, fd=%d",
                  client_fd);
-        // Hier sollte der ws-handler im player-manager schauen, welcher slot frei ist und diesem dann dem client zuweisen. 
-        addPlayer(client_fd);
-        return ESP_OK;
+        return addPlayer(client_fd) ? ESP_OK : ESP_FAIL;
     }
 
     httpd_ws_frame_t ws_pkt;
@@ -95,6 +95,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
 
     if (ws_pkt.len > 0) {
         buf = (uint8_t*)calloc(1, ws_pkt.len + 1);
+        if (buf == NULL) return ESP_ERR_NO_MEM;
         ws_pkt.payload = buf;
         ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
         if (ret != ESP_OK) {
@@ -107,7 +108,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         cJSON *root = cJSON_Parse((const char*)buf);
         if (root) {
             cJSON *type = cJSON_GetObjectItem(root, "type");
-            if (type && strcmp(type->valuestring, "joystick") == 0) {
+            if (cJSON_IsString(type) && strcmp(type->valuestring, "joystick") == 0) {
                 // Übergabe der Joystick-Werte an die identifizierte LedWorm-Instanz
                 cJSON *x_item = cJSON_GetObjectItem(root, "x");
                 cJSON *y_item = cJSON_GetObjectItem(root, "y");
@@ -125,7 +126,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                 }
             }
                 
-            } else if (type && strcmp(type->valuestring, "ambient_color") == 0) {
+            } else if (cJSON_IsString(type) && strcmp(type->valuestring, "ambient_color") == 0) {
                 cJSON *hex_item = cJSON_GetObjectItemCaseSensitive(root, "hex");
                 
                 if (cJSON_IsString(hex_item) && (hex_item->valuestring != NULL)) {
@@ -140,7 +141,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                             ambient_g = static_cast<uint8_t>(g);
                             ambient_b = static_cast<uint8_t>(b);
                             
-                            ESP_LOGD("SERVER", "Hintergrundbeleuchtung geändert auf R:%d G:%d B:%d", ambient_r, ambient_g, ambient_b);
+                            ESP_LOGD("SERVER", "Hintergrundbeleuchtung geändert auf R:%u G:%u B:%u", r, g, b);
                         }
                     }
                 }
@@ -157,6 +158,13 @@ static esp_err_t ws_handler(httpd_req_t *req) {
 httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    // Acht WebSockets plus Platz für den Abruf der Controller-Seite.
+    config.max_open_sockets = MAX_PLAYERS + 2;
+    config.lru_purge_enable = true;
+    config.close_fn = [](httpd_handle_t, int fd) {
+        removePlayer(fd);
+        close(fd);
+    };
 
     ESP_LOGI(TAG, "Starte Server auf Port: '%d'", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
@@ -180,7 +188,6 @@ httpd_handle_t start_webserver(void) {
         };
         httpd_register_uri_handler(server, &ws_uri);
 
-        httpd_config_t config = HTTPD_DEFAULT_CONFIG();
         max_open_sockets = config.max_open_sockets;
         
         return server;

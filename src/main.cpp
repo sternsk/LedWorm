@@ -6,10 +6,13 @@
 #include "webserver.h"
 #include "led_effects.h"
 #include "esp_log.h"
+#include "player_manager.h"
+#include "freertos/task.h"
+#include <cstring>
 
 #define WIFI_SSID      "LedWorm"
 #define WIFI_PASS      "ledworm123"
-#define MAX_STA_CONN   4
+#define MAX_STA_CONN   MAX_PLAYERS
 
 static const char *WIFI_TAG = "WIFI_INIT";
 
@@ -81,6 +84,8 @@ extern "C" void app_main(void) {
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    ESP_ERROR_CHECK(player_manager_init() ? ESP_OK : ESP_ERR_NO_MEM);
 
     ESP_LOGI("MAIN", "Initialisiere Wi-Fi Subsystem...");
     // 2. Wi-Fi im Access Point Modus starten

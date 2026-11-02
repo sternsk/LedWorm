@@ -1,27 +1,28 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 #include "ledworm.h"
 #include "globals.h"
 
 struct player_t {
-    int socketFd;          // WebSocket-Verbindung
-    uint32_t player_id;     // Interne, eindeutige Spieler-ID
-    char player_name[32];   // Vom Spieler gewählter Name
-
-    bool active;            // Spieler ist aktiv
-    LedWorm worm;           // Spielinstanz dieses Spielers
+    int socketFd = -1;
+    uint32_t player_id = 0;
+    char player_name[32] = {};
+    bool active = false;
+    LedWorm worm;
 };
 
-struct joystick_event_t {
+// Kopien statt Referenzen: Der Renderer hält während der LED-Ausgabe keinen Lock.
+struct player_frame_t {
     uint32_t player_id;
     float x;
     float y;
+    uint8_t hue;
 };
 
 bool player_manager_init();
-static bool findPlayerId(int client_fd, uint32_t& player_id);
-
 bool addPlayer(int client_fd);
 void removePlayer(int client_fd);
 bool updateJoystick(int client_fd, float x, float y);
+size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity);

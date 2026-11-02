@@ -1,144 +1,98 @@
-
 #include "player_manager.h"
-
-#include <cstring>
+#include <cmath>
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
 #include "freertos/semphr.h"
 
-// Feste Anzahl von Spielerinstanzen
-static player_t players[MAX_PLAYERS] = {};
+static player_t players[MAX_PLAYERS];
+static SemaphoreHandle_t playerMutex = nullptr;
+static uint32_t nextPlayerId = 1;
 
-// Synchronisierung zwischen Webserver und Render-Task
-static SemaphoreHandle_t playerMutex = xSemaphoreCreateMutex();
-
-// Nächste zu vergebende Spieler-ID
-static uint8_t nextPlayerId = 1;
-
-static QueueHandle_t joystickQueue = nullptr;
-
-bool player_manager_init()
-{
-    joystickQueue = xQueueCreate(
-        32,
-        sizeof(joystick_event_t)
-    );
-
-    return joystickQueue != nullptr;
+// Vor dem Start von Webserver und Render-Task aufrufen.
+bool player_manager_init() {
+    if (playerMutex == nullptr) {
+        playerMutex = xSemaphoreCreateMutex();
+    }
+    return playerMutex != nullptr;
 }
 
-static bool findPlayerId(int client_fd, uint32_t& player_id)
-{
-    for (uint8_t i = 0; i < MAX_PLAYERS; ++i) {
-        if (players[i].active &&
-            players[i].socketFd == client_fd) {
-
-            player_id = players[i].player_id;
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
-// Spieler hinzufügen
-bool addPlayer(int socketFd)
-{
-    if (socketFd < 0) {
-        return false;
-    }
-
-    if (playerMutex == nullptr ||
+bool addPlayer(int socketFd) {
+    if (socketFd < 0 || playerMutex == nullptr ||
         xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) {
         return false;
     }
-
-    // Verbindung darf nicht bereits registriert sein
-    for (uint8_t i = 0; i < MAX_PLAYERS; ++i) {
-        if (players[i].socketFd == socketFd) {
+    for (const auto &player : players) {
+        if (player.active && player.socketFd == socketFd) {
             xSemaphoreGive(playerMutex);
             return false;
         }
     }
-
-    // Freien Platz suchen
-    for (uint8_t i = 0; i < MAX_PLAYERS; ++i) {
-        if (!players[i].active) {
-            const uint8_t playerId = nextPlayerId++;
-
-            // ID 0 ist reserviert
-            if (nextPlayerId == 0) {
-                nextPlayerId = 1;
-            }
-
-            if (!players[i].worm.init(playerId)) {
+    for (size_t i = 0; i < MAX_PLAYERS; ++i) {
+        auto &player = players[i];
+        if (!player.active) {
+            const uint32_t id = nextPlayerId++;
+            if (nextPlayerId == 0) nextPlayerId = 1;
+            if (!player.worm.init(id)) {
                 xSemaphoreGive(playerMutex);
                 return false;
             }
-
-            players[i].socketFd = socketFd;
-
+            // Acht gut verteilte Startplätze auf der 16x16-Matrix.
+            player.worm.x_position = float(2 + (i % 4) * 4);
+            player.worm.y_position = float(4 + (i / 4) * 8);
+            player.socketFd = socketFd;
+            player.player_id = id;
+            player.active = true;
             xSemaphoreGive(playerMutex);
             return true;
         }
     }
-
-    // Keine freie Instanz
     xSemaphoreGive(playerMutex);
     return false;
 }
 
-
-// Spieler entfernen
-void removePlayer(int socketFd)
-{
+void removePlayer(int socketFd) {
     if (playerMutex == nullptr ||
-        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) {
-        return;
-    }
-
-    for (uint8_t i = 0; i < MAX_PLAYERS; ++i) {
-        if (players[i].socketFd == socketFd) {
-            players[i].worm.deactivate();
-            players[i].active = false;
-            players[i].socketFd = -1;
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    for (auto &player : players) {
+        if (player.active && player.socketFd == socketFd) {
+            player.worm.deactivate();
+            player.active = false;
+            player.socketFd = -1;
+            player.player_id = 0;
             break;
         }
     }
-
     xSemaphoreGive(playerMutex);
 }
 
-
-// Joystickdaten aktualisieren
-bool updateJoystick(int socketFd, float x, float y)
-{
-    if (socketFd < 0) {
-        return false;
-    }
-
-    // Ungültige oder außerhalb des erwarteten Bereichs liegende Werte ablehnen
-    if (x < -1.0f || x > 1.0f ||
-        y < -1.0f || y > 1.0f) {
-        return false;
-    }
-
-    if (playerMutex == nullptr ||
-        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) {
-        return false;
-    }
-
-    for (uint8_t i = 0; i < MAX_PLAYERS; ++i) {
-        if (players[i].socketFd == socketFd &&
-            players[i].active) {
-            players[i].worm.setJoystick(x, y);
-
+bool updateJoystick(int socketFd, float x, float y) {
+    if (socketFd < 0 || !std::isfinite(x) || !std::isfinite(y) ||
+        x < -1.0f || x > 1.0f || y < -1.0f || y > 1.0f ||
+        playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
+    for (auto &player : players) {
+        if (player.active && player.socketFd == socketFd) {
+            player.worm.setJoystick(x, y);
             xSemaphoreGive(playerMutex);
             return true;
         }
     }
-
     xSemaphoreGive(playerMutex);
     return false;
+}
+
+size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity) {
+    if (frames == nullptr || playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return 0;
+    size_t count = 0;
+    for (size_t i = 0; i < MAX_PLAYERS; ++i) {
+        auto &player = players[i];
+        if (!player.active) continue;
+        player.worm.move(player.worm.joystick_x, player.worm.joystick_y, now);
+        if (count < capacity) {
+            frames[count++] = {player.player_id, player.worm.x_position,
+                player.worm.y_position, uint8_t(i * 256 / MAX_PLAYERS)};
+        }
+    }
+    xSemaphoreGive(playerMutex);
+    return count;
 }
