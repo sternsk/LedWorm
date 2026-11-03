@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <limits>
 #include <thread>
+#include <initializer_list>
 
 static void movement() {
     LedWorm a, b;
@@ -56,6 +57,21 @@ static void players() {
         }
     }
     const auto a = frames[0], b = frames[1];
+    player_state_t state;
+    assert(getPlayerState(10, state));
+    assert(state.player_id == a.player_id && state.x == a.x && state.y == a.y);
+    assert(state.length == 8 && state.brightness == 63 && state.active_players == MAX_PLAYERS);
+    assert(!getPlayerState(99, state));
+    assert(updateBrightness(10, 0));
+    assert(updateBrightness(11, 255));
+    assert(!updateBrightness(99, 12));
+    for (double invalid : {-1.0, 256.0, 1.5, std::numeric_limits<double>::infinity(),
+                           std::numeric_limits<double>::quiet_NaN()}) {
+        assert(!updateBrightness(10, invalid));
+    }
+    assert(getPlayerState(10, state) && state.brightness == 0);
+    assert(getPlayerState(11, state) && state.brightness == 255);
+    assert(getPlayerState(12, state) && state.brightness == 63);
     assert(updateJoystick(10, 1, 0));
     assert(updateJoystick(11, 0, -1));
     assert(!updateJoystick(12, std::numeric_limits<float>::infinity(), 0));
@@ -63,6 +79,7 @@ static void players() {
     assert(!updateJoystick(12, 2, 0));
     assert(!updateJoystick(99, 1, 0));
     assert(updatePlayerFrames(20000, frames, MAX_PLAYERS) == MAX_PLAYERS);
+    assert(frames[0].brightness == 0 && frames[1].brightness == 255);
     assert(frames[0].x == a.x + 1 && frames[0].y == a.y);
     assert(frames[1].x == b.x && frames[1].y == b.y - 1);
     assert(updatePlayerFrames(40000, frames, 1) == 1);
@@ -75,10 +92,17 @@ static void players() {
     assert(addPlayer(99));
     assert(updatePlayerFrames(60000, frames, MAX_PLAYERS) == MAX_PLAYERS);
     assert(frames[0].player_id != a.player_id);
+    assert(frames[0].brightness == 63);
+    assert(!updateBrightness(10, 50));
     assert(frames[0].x == a.x && frames[0].y == a.y);
     // Netzwerktask und Render-Task arbeiten parallel auf denselben Instanzen.
     std::thread input([] {
-        for (int i = 0; i < 1000; ++i) assert(updateJoystick(11, i % 2 ? 1 : -1, 0));
+        for (int i = 0; i < 1000; ++i) {
+            assert(updateJoystick(11, i % 2 ? 1 : -1, 0));
+            assert(updateBrightness(11, i % 256));
+            player_state_t snapshot;
+            assert(getPlayerState(11, snapshot));
+        }
     });
     for (uint64_t i = 1; i <= 1000; ++i) {
         assert(updatePlayerFrames(60000 + i * 20000, frames, MAX_PLAYERS) == MAX_PLAYERS);
@@ -115,6 +139,16 @@ static void rendering() {
     // Stationäre Köpfe dürfen durch den Schweif nicht immer heller werden.
     for (int i = 0; i < 100; ++i) first.render(pair, 2, {0, 0, 0});
     assert(first.pixels()[overlap].r == 63);
+    // Brightness affects only the matching head, including full off and full on.
+    player_frame_t dimmed[] = {{1, 2, 4, 0, 0}, {2, 6, 4, 86, 255}};
+    first.render(dimmed, 2, {0, 0, 0});
+    assert(first.pixels()[matrixPixelIndex(2, 4)].r == 0);
+    assert(first.pixels()[matrixPixelIndex(2, 4)].g == 0);
+    assert(first.pixels()[matrixPixelIndex(6, 4)].g == 255);
+    dimmed[0].brightness = 17;
+    first.render(dimmed, 2, {0, 0, 0});
+    assert(first.pixels()[matrixPixelIndex(2, 4)].r == 17);
+    assert(first.pixels()[matrixPixelIndex(6, 4)].g == 255);
     // Getrennte Spieler verschwinden vollständig, auch bei hellem Hintergrund.
     for (int i = 0; i < 100; ++i) first.render(nullptr, 0, {12, 8, 9});
     for (size_t i = 0; i < PIXEL_COUNT; ++i) {

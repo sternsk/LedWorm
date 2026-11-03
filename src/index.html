@@ -11,6 +11,8 @@
         
         .status-box { background: #333; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left; }
         .status-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 16px; }
+        .slider-container { display:flex; flex-direction:column; align-items:center; gap:8px; margin-left:20px; }
+        #value-slider { height:140px; direction:rtl; }
         .status-val { color: #00ffff; font-weight: bold; }
         
         .join-box { background: #333; padding: 15px; border-radius: 8px; margin: 20px 0; }
@@ -134,11 +136,11 @@
             </div>
         </div>
 
-        <div class="join-box" id="join-section">
-            <div class="input-group">
-                <input type="text" id="player-id-input" placeholder="Wunsch-ID eingeben...">
-            </div>
-            <button id="btn-join">Join</button>
+        <div class="status-box" aria-label="Dein Wurm">
+            <div class="status-row"><span>Verbindung:</span><span id="connection-state" class="status-val" role="status">Verbinde …</span></div>
+            <div class="status-row"><span>Position X / Y:</span><output id="worm-position" class="status-val">–</output></div>
+            <div class="status-row"><span>Länge (konfiguriert):</span><output id="worm-length" class="status-val">–</output></div>
+            <div class="status-row"><span>Helligkeit (0–255):</span><output id="worm-brightness" class="status-val">–</output></div>
         </div>
         <div class="join-box">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px;">
@@ -155,7 +157,9 @@
         </div>
         <!-- Ein vertikaler Schieberegler von 0 bis 255 -->
         <div class="slider-container">
-            <input type="range" id="value-slider" min="0" max="255" value="128">
+            <label for="value-slider">Deine Helligkeit</label>
+            <input type="range" id="value-slider" min="0" max="255" step="1" value="63" disabled>
+            <output id="brightness-preview" for="value-slider">–</output>
         </div>
     </div>
     
@@ -164,57 +168,64 @@
         const stick = document.getElementById('joystick-stick');
         const zone = document.getElementById('joystick-zone');
         const playerCount = document.getElementById('player-count');
-        const btnJoin = document.getElementById('btn-join');
-        const idInput = document.getElementById('player-id-input');
         const myIdRow = document.getElementById('my-id-row');
         const myIdVal = document.getElementById('my-id-val');
-        const joinSection = document.getElementById('join-section');
+        const connectionState = document.getElementById('connection-state');
+        const wormPosition = document.getElementById('worm-position');
+        const wormLength = document.getElementById('worm-length');
+        const wormBrightness = document.getElementById('worm-brightness');
+        const brightnessPreview = document.getElementById('brightness-preview');
         const ambientColorInput = document.getElementById('ambient-color-input');
         const valueSlider = document.getElementById('value-slider');
         
-        let amIJoined = false;
+        let stateTimer;
+        let haveState = false;
+        let adjustingBrightness = false;
         let active = false;
         let startX, startY;
 
         function initWebSocket() {
-            ws = new WebSocket(`ws://${window.location.hostname}/ws`);
+            ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`);
+            ws.onopen = () => {
+                connectionState.textContent = 'Verbunden';
+                const requestState = () => {
+                    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'state'}));
+                };
+                requestState();
+                stateTimer = setInterval(requestState, 200);
+            };
             ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                
-                // 1. Server meldet allgemeinen Status & ID-Vorschlag
-                if (data.type === "status") {
-                    playerCount.innerText = data.count;
-                    if (!amIJoined && data.suggestedId) {
-                        idInput.value = data.suggestedId;
-                    }
-                }
-                // 2. Server antwortet auf Join-Anfrage
-                else if (data.type === "join_response") {
-                    if (data.success) {
-                        amIJoined = true;
-                        joinSection.style.display = "none";
-                        myIdRow.style.display = "flex";
-                        myIdVal.innerText = data.id;
-                    } else {
-                        alert("ID bereits vergeben oder Server voll! Bitte andere ID wählen.");
-                    }
+                let data;
+                try { data = JSON.parse(event.data); } catch { return; }
+                if (data.type !== 'player_state') return;
+                haveState = true;
+                playerCount.textContent = data.count;
+                myIdRow.style.display = 'flex';
+                myIdVal.textContent = data.id;
+                wormPosition.textContent = `${data.x.toFixed(2)} / ${data.y.toFixed(2)}`;
+                wormLength.textContent = data.length;
+                wormBrightness.textContent = `${data.brightness} (${Math.round(data.brightness / 255 * 100)} %)`;
+                valueSlider.disabled = false;
+                if (!adjustingBrightness) {
+                    valueSlider.value = data.brightness;
+                    brightnessPreview.textContent = data.brightness;
                 }
             };
             ws.onclose = () => {
-                amIJoined = false;
-                joinSection.style.display = "block";
-                myIdRow.style.display = "none";
+                clearInterval(stateTimer);
+                haveState = false;
+                active = false;
+                adjustingBrightness = false;
+                stick.style.left = stick.style.top = '60px';
+                connectionState.textContent = 'Getrennt – verbinde erneut …';
+                myIdRow.style.display = 'none';
+                playerCount.textContent = '–';
+                wormPosition.textContent = wormLength.textContent = wormBrightness.textContent = '–';
+                brightnessPreview.textContent = '–';
+                valueSlider.disabled = true;
                 setTimeout(initWebSocket, 2000);
             };
         }
-
-        // Join Button Event
-        btnJoin.addEventListener('click', () => {
-            const desiredId = idInput.value.trim();
-            if (desiredId && ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: "join_request", id: desiredId }));
-            }
-        });
 
         // Joystick Logik 
         zone.addEventListener('touchstart', startMove, {passive: false});
@@ -225,6 +236,7 @@
         window.addEventListener('mousemove', move);
 
         function startMove(e) {
+            if (!haveState) return;
             active = true;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -297,14 +309,14 @@
             }
         });
 
-        valueSlider.addEventListener('input', (e) => {
-            const v = e.target.value;
-
-            if (ws && ws.readyState === WebSocket.OPEN){
-                ws.send(JSON.stringify({
-                    type: "value",
-                    int: v
-                }));
+        valueSlider.addEventListener('pointerdown', () => { adjustingBrightness = true; });
+        window.addEventListener('pointerup', () => { adjustingBrightness = false; });
+        window.addEventListener('pointercancel', () => { adjustingBrightness = false; });
+        valueSlider.addEventListener('input', (event) => {
+            const value = Number(event.target.value);
+            brightnessPreview.textContent = value;
+            if (haveState && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type:'value', value}));
             }
         });
 

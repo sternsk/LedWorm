@@ -9,6 +9,7 @@ public:
     float x_position = 0.0f;
     float y_position = 0.0f;
     uint8_t length = 8;
+    uint8_t brightness = 63;
     uint8_t nominal_speed = 50;
     bool active = false;
 
