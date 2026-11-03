@@ -16,7 +16,9 @@ In `src/globals.h` sind Abmessungen, LED-Pin und Verdrahtung festgelegt:
 
 Der Render-Task aktualisiert alle Spieler mit demselben Zeitstempel und
 übernimmt ihre Positionen unter einem Mutex. Die LED-Ausgabe erfolgt danach
-ohne diesen Lock. Pro Frame werden alle Köpfe zusammengeführt und einmal an
+ohne diesen Lock. Zwischenpositionen werden über die Helligkeit auf bis zu vier benachbarte
+LEDs verteilt, damit die Bewegung bei 50 Bildern pro Sekunde weich erscheint.
+Pro Frame werden alle Köpfe zusammengeführt und einmal an
 die Hardware gesendet. Überlappende Köpfe mischen ihre Farben; alte Positionen
 blenden zur gewählten Hintergrundfarbe aus. Beim Verbindungsende wird der
 Spielerplatz freigegeben. Die Schweife sind ein visueller Fade, keine bereits

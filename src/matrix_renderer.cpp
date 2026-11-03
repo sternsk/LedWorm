@@ -42,13 +42,25 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
         if (!std::isfinite(player.x) || !std::isfinite(player.y) ||
             player.x < 0 || player.x > MATRIX_WIDTH - 1 ||
             player.y < 0 || player.y > MATRIX_HEIGHT - 1) continue;
-        const auto index = matrixPixelIndex(uint8_t(player.x + 0.5f),
-                                            uint8_t(player.y + 0.5f));
-        occupied[index] = true;
+        // Bilineare Verteilung macht auch Positionen zwischen LEDs sichtbar.
+        const int x0 = int(player.x), y0 = int(player.y);
+        const float fx = player.x - x0, fy = player.y - y0;
         const auto color = playerColor(player.hue, player.brightness);
-        heads[index].r = add(heads[index].r, color.r);
-        heads[index].g = add(heads[index].g, color.g);
-        heads[index].b = add(heads[index].b, color.b);
+        for (int dy = 0; dy <= 1; ++dy) {
+            for (int dx = 0; dx <= 1; ++dx) {
+                const int x = x0 + dx, y = y0 + dy;
+                if (x >= MATRIX_WIDTH || y >= MATRIX_HEIGHT) continue;
+                const float weight = (dx ? fx : 1.0f - fx) *
+                                     (dy ? fy : 1.0f - fy);
+                if (weight <= 0.0f) continue;
+                const auto index = matrixPixelIndex(uint8_t(x), uint8_t(y));
+                occupied[index] = true;
+                auto &head = heads[index];
+                head.r = add(head.r, uint8_t(std::lround(color.r * weight)));
+                head.g = add(head.g, uint8_t(std::lround(color.g * weight)));
+                head.b = add(head.b, uint8_t(std::lround(color.b * weight)));
+            }
+        }
     }
     for (size_t i = 0; i < PIXEL_COUNT; ++i) {
         if (occupied[i]) {
