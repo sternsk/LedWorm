@@ -10,6 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "mdns.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 
@@ -20,8 +21,27 @@ const char *TAG = "wifi_manager";
 EventGroupHandle_t events;
 wifi_manager_callback_t notify;
 httpd_handle_t setup_server;
+bool mdns_running = false;
 extern const uint8_t html_start[] asm("_binary_wifi_setup_html_start");
 extern const uint8_t html_end[] asm("_binary_wifi_setup_html_end");
+
+void start_mdns() {
+    if (mdns_running) return;
+    esp_err_t err = mdns_init();
+    if (err == ESP_OK) {
+        err = mdns_hostname_set("ledworm");
+        if (err == ESP_OK) err = mdns_instance_name_set("LedWorm");
+        if (err == ESP_OK) err = mdns_service_add("LedWorm", "_http", "_tcp", 80, nullptr, 0);
+        if (err != ESP_OK) mdns_free();
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "mDNS nicht verfuegbar (%s); Zugriff ueber IP bleibt moeglich",
+                 esp_err_to_name(err));
+        return;
+    }
+    mdns_running = true;
+    ESP_LOGI(TAG, "Spiel erreichbar unter http://ledworm.local/");
+}
 
 esp_err_t store(const wifi_config_t *config) {
     nvs_handle_t handle;
@@ -134,6 +154,10 @@ esp_err_t save(httpd_req_t *req) {
 }
 
 void setup() {
+    if (mdns_running) {
+        mdns_free();
+        mdns_running = false;
+    }
     ESP_ERROR_CHECK(esp_wifi_stop());
     // STA interface enables scanning; no automatic connection attempts in setup.
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
@@ -183,7 +207,11 @@ void manager(void *) {
         if (!provisioning) {
             if (bits & CONNECTED) {
                 since = now;
-                if (!serving) { notify(true); serving = true; }
+                if (!serving) {
+                    notify(true);
+                    start_mdns();
+                    serving = true;
+                }
             } else if (now - since >= CONNECTION_TIMEOUT) {
                 if (serving) { notify(false); serving = false; }
                 ESP_LOGW(TAG, "Keine IP nach 30 Sekunden; starte Setup");
@@ -211,8 +239,9 @@ esp_err_t wifi_manager_start(wifi_manager_callback_t callback) {
     notify = callback;
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    if (!esp_netif_create_default_wifi_sta() || !esp_netif_create_default_wifi_ap())
-        return ESP_ERR_NO_MEM;
+    esp_netif_t *station = esp_netif_create_default_wifi_sta();
+    if (!station || !esp_netif_create_default_wifi_ap()) return ESP_ERR_NO_MEM;
+    ESP_ERROR_CHECK(esp_netif_set_hostname(station, "ledworm"));
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&init));
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));

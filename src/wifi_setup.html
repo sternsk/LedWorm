@@ -49,7 +49,7 @@ document.querySelector('#setup').onsubmit = async event => {
     const response = await fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ssid,password})});
     if (!response.ok) throw new Error(await response.text());
     document.querySelector('#password').value = '';
-    status.textContent = 'Gespeichert. LedWorm startet neu.\nVerbinde dieses Gerät wieder mit deinem Heimnetz. Die IP-Adresse findest du im Router oder im seriellen Monitor.\nFalls die Verbindung scheitert, erscheint nach etwa 30 Sekunden wieder LedWorm-Setup.';
+    status.textContent = 'Gespeichert. LedWorm startet neu.\nVerbinde dieses Gerät wieder mit deinem Heimnetz. Öffne http://ledworm.local/ im Browser. Falls der Name nicht aufgelöst wird, findest du die IP-Adresse im Router oder im seriellen Monitor.\nFalls die Verbindung scheitert, erscheint nach etwa 30 Sekunden wieder LedWorm-Setup.';
   } catch (error) {
     status.textContent = 'Speichern nicht bestätigt. Falls LedWorm bereits neu startet, prüfe dein Heimnetz. Sonst erneut versuchen.';
     save.disabled = false; scanButton.disabled = false;

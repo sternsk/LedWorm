@@ -80,9 +80,19 @@ SSID: 1–32 Bytes, einschließlich Leerzeichen und UTF-8-Zeichen.
 
 Nach erfolgreichem Speichern in NVS startet LedWorm neu. Das Setup-WLAN
 verschwindet. Das Bediengerät wieder mit dem Heimnetz verbinden und die
-ESP32-IP im Router oder seriellen Monitor nachsehen. Unter `http://<ESP32-IP>/`
-stehen Spiel und WebSocket bereit. `localhost` bezeichnet den eigenen PC;
-mDNS (`ledworm.local`) ist derzeit nicht implementiert.
+**http://ledworm.local/** öffnen. Nach IP-Bezug meldet LedWorm den Hostnamen
+`ledworm.local` und den HTTP-Dienst `_http._tcp` auf Port 80 per mDNS an.
+Der WebSocket verwendet automatisch denselben Hostnamen. Zusätzlich wird
+`ledworm` als DHCP-Hostname gesetzt. Beim Wechsel zurück ins Setup wird mDNS
+beendet; nach kurzen WLAN-Unterbrechungen übernimmt mDNS die aktuelle IP.
+
+Falls das Betriebssystem oder das WLAN kein mDNS unterstützt (z. B. durch
+Client-Isolation oder gefilterten Multicast), die ESP32-IP im Router oder im
+seriellen Monitor nachsehen und `http://<ESP32-IP>/` öffnen. Beide Geräte
+müssen sich im selben lokalen Netz befinden. `localhost` bezeichnet den
+eigenen PC. Im Setup gilt weiterhin `http://192.168.4.1/`.
+Mehrere LedWorm-Geräte benötigen unterschiedliche mDNS-Namen; der hier
+konfigurierte Name ist fest `ledworm`.
 
 Gespeicherte Zugangsdaten werden bei jedem Start verwendet. Wird innerhalb
 von etwa 30 Sekunden keine IP bezogen, öffnet sich wieder `LedWorm-Setup`.
@@ -120,7 +130,7 @@ node tests/wifi_setup_test.cjs
 1. Ohne WLAN-Konfiguration starten: Setup-WLAN und Seite unter 192.168.4.1
    prüfen; LED-Rendering muss weiterlaufen.
 2. WLAN-Suche und manuelle SSID prüfen, gültige Daten speichern: Neustart,
-   Router-IP und Spiel mit mehreren WebSockets prüfen.
+   `http://ledworm.local/`, Router-IP und Spiel mit mehreren WebSockets prüfen.
 3. Strom trennen und neu starten: automatische Verbindung mit gespeicherten Daten.
 4. Falsches Passwort speichern: nach etwa 30 Sekunden wieder Setup, anschließend
    mit richtigen Daten korrigieren. Auch versteckte und offene Netze prüfen.
@@ -140,3 +150,8 @@ node tests/controller_test.cjs
 Am Gerät mit zwei Browsern prüfen: nur der eigene Wurm ändert seine Helligkeit,
 Positionen werden während der Bewegung aktualisiert, und nach einer Trennung
 erscheinen bis zum erneuten Verbindungsaufbau keine alten Werte.
+
+mDNS am Gerät prüfen: Nach dem WLAN-Start `http://ledworm.local/` auf einem
+zweiten Gerät im selben Heimnetz öffnen und den Controller benutzen. Nach
+Neustart sowie kurzem Router-Ausfall erneut prüfen, auch bei geänderter DHCP-IP.
+Bei längerem Ausfall muss das Setup weiterhin über 192.168.4.1 erreichbar sein.
