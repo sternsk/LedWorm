@@ -9,7 +9,7 @@ struct WebClientData {
     std::string player_id;
 };
 
-void send_player_list_to_all(httpd_handle_t hd);
+
 
 static esp_err_t get_index_handler(httpd_req_t *req);
 
