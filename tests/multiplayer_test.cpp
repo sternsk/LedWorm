@@ -11,6 +11,7 @@ static void movement() {
     assert(!a.move(1, 1, 0));
     assert(!a.init(0));
     assert(a.init(1) && b.init(2));
+    a.nominal_speed = b.nominal_speed = 50; // Testgeschwindigkeit: 1 LED / 20 ms.
     a.x_position = b.x_position = 8;
     a.y_position = b.y_position = 8;
     assert(!a.move(1, 0, 0));
@@ -80,8 +81,8 @@ static void players() {
     assert(!updateJoystick(99, 1, 0));
     assert(updatePlayerFrames(20000, frames, MAX_PLAYERS) == MAX_PLAYERS);
     assert(frames[0].brightness == 0 && frames[1].brightness == 255);
-    assert(frames[0].x == a.x + 1 && frames[0].y == a.y);
-    assert(frames[1].x == b.x && frames[1].y == b.y - 1);
+    assert(std::abs(frames[0].x - (a.x + 0.1f)) < 0.0001f && frames[0].y == a.y);
+    assert(frames[1].x == b.x && std::abs(frames[1].y - (b.y - 0.1f)) < 0.0001f);
     assert(updatePlayerFrames(40000, frames, 1) == 1);
     // Die Snapshot-Daten dürfen von späteren Joystick-Updates unberührt bleiben.
     const auto copy = frames[0];
@@ -121,6 +122,26 @@ static void rendering() {
     assert(matrixPixelIndex(0, 1, true) == 31);
     assert(matrixPixelIndex(15, 1, true) == 16);
     assert(matrixPixelIndex(0, 2, true) == 32);
+    // Zwischenpositionen verteilen Licht, statt an der halben LED zu springen.
+    MatrixRenderer smooth;
+    player_frame_t moving[] = {{1, 2.25f, 4, 0}};
+    smooth.render(moving, 1, {0, 0, 0});
+    assert(smooth.pixels()[matrixPixelIndex(2, 4)].r == 47);
+    assert(smooth.pixels()[matrixPixelIndex(3, 4)].r == 16);
+    moving[0].x = 2.75f;
+    smooth.render(moving, 1, {0, 0, 0});
+    assert(smooth.pixels()[matrixPixelIndex(2, 4)].r == 16);
+    assert(smooth.pixels()[matrixPixelIndex(3, 4)].r == 47);
+    moving[0].x = 2.5f;
+    moving[0].y = 4.5f;
+    smooth.render(moving, 1, {0, 0, 0});
+    for (int y = 4; y <= 5; ++y)
+        for (int x = 2; x <= 3; ++x)
+            assert(smooth.pixels()[matrixPixelIndex(x, y)].r == 16);
+    moving[0].x = 15;
+    moving[0].y = 15;
+    smooth.render(moving, 1, {0, 0, 0});
+    assert(smooth.pixels()[matrixPixelIndex(15, 15)].r == 63);
     MatrixRenderer first, reversed;
     player_frame_t pair[] = {{1, 2, 4, 0}, {2, 6, 4, 86}};
     first.render(pair, 2, {0, 0, 0});
