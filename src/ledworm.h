@@ -9,7 +9,7 @@ public:
     float x_position = 0.0f;
     float y_position = 0.0f;
     uint8_t length = 8;
-    uint8_t nominal_speed = 50;
+    uint8_t nominal_speed = 30;
     bool active = false;
 
     bool init(uint32_t playerId);
