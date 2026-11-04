@@ -8,6 +8,8 @@ bool LedWorm::init(uint32_t playerId) {
     joystick_y = 0.0f;
     x_position = 0.0f;
     y_position = 0.0f;
+    length = 8;
+    brightness = 63;
     last_move_time = 0;
     clock_started = false;
     active = playerId != 0;

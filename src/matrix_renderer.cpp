@@ -7,8 +7,7 @@ size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
     return size_t(y) * MATRIX_WIDTH + x;
 }
 
-static rgb_pixel_t playerColor(uint8_t hue) {
-    constexpr uint8_t value = 63;
+static rgb_pixel_t playerColor(uint8_t hue, uint8_t value) {
     const uint8_t region = hue / 43;
     const uint8_t remainder = (hue % 43) * 6;
     const uint8_t rising = (value * remainder) / 255;
@@ -37,6 +36,7 @@ static uint8_t add(uint8_t a, uint8_t b) {
 void MatrixRenderer::render(const player_frame_t *players, size_t count,
                             rgb_pixel_t ambient) {
     rgb_pixel_t heads[PIXEL_COUNT] = {};
+    bool occupied[PIXEL_COUNT] = {};
     for (size_t i = 0; players != nullptr && i < count; ++i) {
         const auto &player = players[i];
         if (!std::isfinite(player.x) || !std::isfinite(player.y) ||
@@ -44,13 +44,14 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
             player.y < 0 || player.y > MATRIX_HEIGHT - 1) continue;
         const auto index = matrixPixelIndex(uint8_t(player.x + 0.5f),
                                             uint8_t(player.y + 0.5f));
-        const auto color = playerColor(player.hue);
+        occupied[index] = true;
+        const auto color = playerColor(player.hue, player.brightness);
         heads[index].r = add(heads[index].r, color.r);
         heads[index].g = add(heads[index].g, color.g);
         heads[index].b = add(heads[index].b, color.b);
     }
     for (size_t i = 0; i < PIXEL_COUNT; ++i) {
-        if (heads[i].r || heads[i].g || heads[i].b) {
+        if (occupied[i]) {
             frame_buffer[i] = heads[i];
         } else {
             auto &pixel = frame_buffer[i];

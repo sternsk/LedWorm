@@ -22,8 +22,24 @@ blenden zur gewählten Hintergrundfarbe aus. Beim Verbindungsende wird der
 Spielerplatz freigegeben. Die Schweife sind ein visueller Fade, keine bereits
 implementierten Spielkörper oder Kollisionen.
 
-Spieler werden aktuell beim WebSocket-Handshake angelegt. Die vorhandene
-Lobby-Oberfläche mit Wunsch-ID/Join-Anfrage ist noch ein separater Prototyp.
+Spieler werden beim WebSocket-Handshake automatisch angelegt. Die Oberfläche
+zeigt die zugewiesene Spieler-ID, Spielerzahl und alle 200 ms den eigenen
+Serverzustand: Position X/Y, konfigurierte Länge und Helligkeit (0–255 sowie
+Prozent). Die konfigurierte Länge beträgt aktuell 8; der sichtbare Schweif ist
+weiterhin ein Fade und kein Segmentkörper dieser Länge.
+
+Der `value-slider` steuert ausschließlich die Helligkeit des eigenen Wurms;
+die Zuordnung erfolgt serverseitig über den WebSocket, nicht über eine vom
+Browser angegebene Spieler-ID. Standard ist 63 (die bisherige Helligkeit),
+0 schaltet den Kopf aus, 255 liefert die volle Kanalhelligkeit. Bereits gezeichnete
+Schweife blenden weiterhin aus. Die Hintergrundfarbe bleibt separat steuerbar.
+Bei Verbindungsverlust werden veraltete Messwerte ausgeblendet und der Slider
+bis zur erneuten Anmeldung deaktiviert.
+
+WebSocket-Nachrichten: `{"type":"value","value":128}` setzt eine ganzzahlige
+Helligkeit; `{"type":"state"}` fragt einen unveränderlichen Snapshot ab.
+`player_state` liefert `id`, `x`, `y`, `length`, `brightness` und `count`.
+Ein Helligkeitskommando erhält ebenfalls den bestätigten Serverzustand zurück.
 
 ## Build und Tests
 
@@ -35,8 +51,8 @@ pio run -e LedWorm -j 4
 ```
 
 Für acht Spieler sind `CONFIG_LWIP_MAX_SOCKETS=16` in `sdkconfig.LedWorm`
-und `sdkconfig.defaults` hinterlegt. Das WLAN erlaubt acht Stationen, der
-HTTP-Server zehn Client-Sockets einschließlich WebSockets.
+und `sdkconfig.defaults` hinterlegt. Der HTTP-Server erlaubt zehn
+Client-Sockets einschließlich bis zu acht Spieler-WebSockets im Heimnetz.
 
 Hardwareunabhängige Regressionstests mit G++, AddressSanitizer und
 UndefinedBehaviorSanitizer:
@@ -47,6 +63,80 @@ bash tests/run_host_tests.sh
 
 Die Tests prüfen unabhängige Bewegung, Matrixgrenzen, acht Spieler,
 Slot-Wiederverwendung, ungültige Eingaben, parallele Joystick-/Render-Zugriffe,
-beide Verdrahtungsvarianten, Farbmischung und ausblendende Schweife. Der
+beide Verdrahtungsvarianten, Farbmischung, individuelle Helligkeit einschließlich
+0/255, Zustandsabfragen und ausblendende Schweife. Der
 FreeRTOS-Mutex wird dabei durch einen echten Host-Mutex ersetzt. Die Tests
 ersetzen keinen Firmware-Build oder Funktionstest am ESP32.
+
+## WLAN einrichten
+
+Ohne gespeicherte Zugangsdaten bietet der ESP32 das offene WLAN
+`LedWorm-Setup` an. Damit verbinden und **http://192.168.4.1/** öffnen
+(kein automatisches Captive Portal). Dort WLANs suchen oder die SSID manuell
+eingeben, Passwort eintragen und speichern. Unterstützt werden 2,4-GHz-Netze
+mit offenem Zugang oder persönlichem WLAN-Passwort (8–63 Bytes); Enterprise-
+Anmeldung und 64-stellige Hex-PSKs sind nicht Teil dieser Oberfläche.
+SSID: 1–32 Bytes, einschließlich Leerzeichen und UTF-8-Zeichen.
+
+Nach erfolgreichem Speichern in NVS startet LedWorm neu. Das Setup-WLAN
+verschwindet. Das Bediengerät wieder mit dem Heimnetz verbinden und die
+ESP32-IP im Router oder seriellen Monitor nachsehen. Unter `http://<ESP32-IP>/`
+stehen Spiel und WebSocket bereit. `localhost` bezeichnet den eigenen PC;
+mDNS (`ledworm.local`) ist derzeit nicht implementiert.
+
+Gespeicherte Zugangsdaten werden bei jedem Start verwendet. Wird innerhalb
+von etwa 30 Sekunden keine IP bezogen, öffnet sich wieder `LedWorm-Setup`.
+Dasselbe gilt bei längerem Verbindungsverlust während des Spiels. Bei kurzen
+Ausfällen verbindet sich der ESP32 erneut; Browser müssen gegebenenfalls neu
+verbunden werden. Beim Wechsel ins Setup werden der Spielserver und seine
+WebSockets geschlossen. Bestehende Zugangsdaten bleiben bis zum Überschreiben
+oder expliziten Zurücksetzen gespeichert.
+
+`wifi_manager.cpp` besitzt Netzwerk, NVS und einen eigenen Setup-HTTP-Server.
+Ein separater FreeRTOS-Task verwaltet Verbindungsversuche und Moduswechsel.
+Event-Handler melden nur den Verbindungsstatus. `main.cpp` startet den
+Spielserver erst nach IP-Bezug und stoppt ihn vor dem Setup-Server; beide
+verwenden exklusiv Port 80. Der LED-Task läuft auch während des Setups weiter.
+Die WLAN-Suche blockiert ausschließlich den separaten Setup-HTTP-Task.
+
+`wifi_manager_reset()` löscht nur den Schlüssel im Namespace `ledworm_wifi`
+und plant einen Neustart. Die Funktion kann später aus einem entprellten
+Tasten-Task nach langem Tastendruck aufgerufen werden, nicht aus einem ISR.
+Die Tastenbelegung ist noch nicht implementiert. NVS-Initialisierungsfehler
+führen bewusst nicht zum automatischen Löschen anderer Anwendungsdaten.
+
+Das Setup-WLAN und sein HTTP-Zugang sind offen; die Einrichtung in einer
+vertrauenswürdigen Umgebung durchführen. Zugangsdaten werden nicht geloggt,
+liegen aber ohne aktivierte NVS-/Flash-Verschlüsselung unverschlüsselt im Flash.
+
+Zusätzlicher Oberflächentest (Node.js, ohne Zusatzpakete):
+
+```sh
+node tests/wifi_setup_test.cjs
+```
+
+### Prüfung am ESP32
+
+1. Ohne WLAN-Konfiguration starten: Setup-WLAN und Seite unter 192.168.4.1
+   prüfen; LED-Rendering muss weiterlaufen.
+2. WLAN-Suche und manuelle SSID prüfen, gültige Daten speichern: Neustart,
+   Router-IP und Spiel mit mehreren WebSockets prüfen.
+3. Strom trennen und neu starten: automatische Verbindung mit gespeicherten Daten.
+4. Falsches Passwort speichern: nach etwa 30 Sekunden wieder Setup, anschließend
+   mit richtigen Daten korrigieren. Auch versteckte und offene Netze prüfen.
+5. Router kurz und länger als 30 Sekunden ausschalten: Wiederverbindung bzw.
+   Rückkehr ins Setup und Freigabe der Spielerplätze prüfen.
+6. `wifi_manager_reset()` aus einem Task auslösen: nach Neustart wieder Setup;
+   andere NVS-Anwendungsdaten müssen erhalten bleiben.
+
+Hosttests und Firmware-Build ersetzen diese Funk-/Hardwareprüfungen nicht.
+
+Controller-Oberfläche ohne Zusatzpakete testen:
+
+```sh
+node tests/controller_test.cjs
+```
+
+Am Gerät mit zwei Browsern prüfen: nur der eigene Wurm ändert seine Helligkeit,
+Positionen werden während der Bewegung aktualisiert, und nach einer Trennung
+erscheinen bis zum erneuten Verbindungsaufbau keine alten Werte.

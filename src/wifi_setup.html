@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LedWorm WLAN-Setup</title>
+<style>
+body{font:17px system-ui,sans-serif;background:#111827;color:#f9fafb;margin:0;padding:24px}main{max-width:460px;margin:5vh auto}h1{color:#86efac}label{display:block;margin-top:20px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;border-radius:8px;margin-top:8px;border:1px solid #64748b}button{background:#86efac;color:#111827;cursor:pointer}button:disabled{opacity:.5}p{line-height:1.5}#status{white-space:pre-line}small{color:#cbd5e1}
+</style>
+<main>
+<h1>LedWorm verbinden</h1>
+<p>Wähle dein 2,4-GHz-WLAN oder gib den Namen eines versteckten Netzes ein.</p>
+<button type="button" id="scan">WLANs suchen</button>
+<form id="setup">
+<label for="ssid">WLAN-Name</label><input id="ssid" list="networks" required autocomplete="off"><datalist id="networks"></datalist>
+<label for="password">WLAN-Passwort</label><input id="password" type="password" maxlength="63" autocomplete="new-password">
+<small>Für ein offenes WLAN leer lassen.</small>
+<button id="save">Speichern und verbinden</button>
+</form>
+<p id="status" role="status" aria-live="polite"></p>
+<small>Das Setup-WLAN ist offen. Richte LedWorm in einer vertrauenswürdigen Umgebung ein.</small>
+</main>
+<script>
+const status = document.querySelector('#status');
+const scanButton = document.querySelector('#scan');
+scanButton.onclick = async () => {
+  scanButton.disabled = true;
+  status.textContent = 'Suche läuft …';
+  try {
+    const response = await fetch('/api/scan');
+    if (!response.ok) throw new Error(await response.text());
+    const names = [...new Set(await response.json())].filter(Boolean);
+    document.querySelector('#networks').replaceChildren(...names.map(name => {
+      const option = document.createElement('option'); option.value = name; return option;
+    }));
+    status.textContent = names.length ? 'WLAN-Name auswählen oder eingeben.' : 'Kein WLAN gefunden. Du kannst den Namen manuell eingeben.';
+  } catch (error) { status.textContent = 'Suche fehlgeschlagen. Bitte erneut versuchen oder WLAN-Namen eingeben.'; }
+  finally { scanButton.disabled = false; }
+};
+document.querySelector('#setup').onsubmit = async event => {
+  event.preventDefault();
+  const ssid = document.querySelector('#ssid').value;
+  const password = document.querySelector('#password').value;
+  const bytes = value => new TextEncoder().encode(value).length;
+  if (bytes(ssid) < 1 || bytes(ssid) > 32 || (bytes(password) !== 0 && (bytes(password) < 8 || bytes(password) > 63))) {
+    status.textContent = 'WLAN-Name: 1–32 Bytes. Passwort: leer oder 8–63 Bytes.'; return;
+  }
+  const save = document.querySelector('#save'); save.disabled = true; scanButton.disabled = true;
+  try {
+    const response = await fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ssid,password})});
+    if (!response.ok) throw new Error(await response.text());
+    document.querySelector('#password').value = '';
+    status.textContent = 'Gespeichert. LedWorm startet neu.\nVerbinde dieses Gerät wieder mit deinem Heimnetz. Die IP-Adresse findest du im Router oder im seriellen Monitor.\nFalls die Verbindung scheitert, erscheint nach etwa 30 Sekunden wieder LedWorm-Setup.';
+  } catch (error) {
+    status.textContent = 'Speichern nicht bestätigt. Falls LedWorm bereits neu startet, prüfe dein Heimnetz. Sonst erneut versuchen.';
+    save.disabled = false; scanButton.disabled = false;
+  }
+};
+</script>
+</html>
