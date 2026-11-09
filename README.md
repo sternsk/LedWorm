@@ -3,7 +3,9 @@
 ESP32-S3-Firmware für eine 16×16-WS2812-Matrix und bis zu acht
 WebSocket-Spieler. Jeder verbundene Controller erhält einen eigenen Wurm,
 eine feste Farbe und einen verteilten Startpunkt. Der Joystick bewegt den
-Spieler auf beiden Achsen; an den Matrixrändern stoppt die Bewegung.
+Spieler auf beiden Achsen; beim Überschreiten eines Matrixrands erscheint
+der Wurm auf der gegenüberliegenden Seite. Der verbleibende Bewegungsweg
+bleibt dabei erhalten, auch bei diagonalen Übergängen.
 
 ## Matrix und Rendering
 

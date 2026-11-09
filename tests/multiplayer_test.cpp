@@ -5,6 +5,7 @@
 #include <limits>
 #include <thread>
 #include <initializer_list>
+#include <utility>
 
 static void movement() {
     LedWorm tuned;
@@ -32,9 +33,17 @@ static void movement() {
     a.move(1, 1, 10000000);
     assert(a.x_position == 15 && a.y_position == 13);
     a.move(1, 1, 10020000);
-    assert(a.x_position == 15 && a.y_position == 14);
+    assert(a.x_position == 0 && a.y_position == 14);
     for (unsigned i = 1; i < 20; ++i) a.move(-1, -1, 10020000 + i * 100000);
-    assert(a.x_position == 0 && a.y_position == 0);
+    assert(a.x_position == 1 && a.y_position == 15);
+    // Fractional overshoot is retained on both axes, in both directions.
+    a.x_position = MATRIX_WIDTH - 0.25f;
+    a.y_position = MATRIX_HEIGHT - 0.25f;
+    a.move(1, 1, 11940000);
+    assert(a.x_position == 0.75f && a.y_position == 0.75f);
+    a.move(-1, -1, 11960000);
+    assert(a.x_position == MATRIX_WIDTH - 0.25f);
+    assert(a.y_position == MATRIX_HEIGHT - 0.25f);
     assert(!a.move(std::numeric_limits<float>::quiet_NaN(), 0, 13000000));
     a.deactivate();
     assert(!a.move(1, 1, 14000000));
@@ -114,7 +123,7 @@ static void players() {
     });
     for (uint64_t i = 1; i <= 1000; ++i) {
         assert(updatePlayerFrames(60000 + i * 20000, frames, MAX_PLAYERS) == MAX_PLAYERS);
-        assert(frames[1].x >= 0 && frames[1].x <= 15);
+        assert(frames[1].x >= 0 && frames[1].x < MATRIX_WIDTH);
     }
     input.join();
     removePlayer(99);
@@ -123,6 +132,19 @@ static void players() {
 }
 
 static void rendering() {
+    // Nearest-LED rounding must wrap rather than address beyond the matrix.
+    for (const auto &position : {std::pair<float, float>{15.75f, 3.0f},
+                                 {3.0f, 15.75f}, {15.75f, 15.75f}}) {
+        MatrixRenderer edge;
+        player_frame_t head = {1, position.first, position.second, 0, 255};
+        edge.render(&head, 1, {0, 0, 0});
+        const auto x = uint8_t(int(position.first + 0.5f) % MATRIX_WIDTH);
+        const auto y = uint8_t(int(position.second + 0.5f) % MATRIX_HEIGHT);
+        assert(edge.pixels()[matrixPixelIndex(x, y)].r == 255);
+        unsigned total = 0;
+        for (size_t i = 0; i < PIXEL_COUNT; ++i) total += edge.pixels()[i].r;
+        assert(total == 255);
+    }
     assert(matrixPixelIndex(0, 0, false) == 0);
     assert(matrixPixelIndex(15, 15, false) == 255);
     assert(matrixPixelIndex(0, 1, false) == 16);

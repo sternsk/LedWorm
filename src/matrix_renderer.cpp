@@ -40,10 +40,10 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     for (size_t i = 0; players != nullptr && i < count; ++i) {
         const auto &player = players[i];
         if (!std::isfinite(player.x) || !std::isfinite(player.y) ||
-            player.x < 0 || player.x > MATRIX_WIDTH - 1 ||
-            player.y < 0 || player.y > MATRIX_HEIGHT - 1) continue;
-        const auto index = matrixPixelIndex(uint8_t(player.x + 0.5f),
-                                            uint8_t(player.y + 0.5f));
+            player.x < 0 || player.x >= MATRIX_WIDTH ||
+            player.y < 0 || player.y >= MATRIX_HEIGHT) continue;
+        const auto index = matrixPixelIndex(uint8_t(int(player.x + 0.5f) % MATRIX_WIDTH),
+                                            uint8_t(int(player.y + 0.5f) % MATRIX_HEIGHT));
         occupied[index] = true;
         const auto color = playerColor(player.hue, player.brightness);
         heads[index].r = add(heads[index].r, color.r);
