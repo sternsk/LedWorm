@@ -440,6 +440,7 @@ static void autopilot() {
     assert(updateJoystick(401, 0, 0) && updateJoystick(402, 0, 0));
     updatePlayerFrames(5000000, frames, MAX_PLAYERS, &vitamin);
     const float start_x = frames[0].x, start_y = frames[0].y;
+    const float other_start_x = frames[1].x, other_start_y = frames[1].y;
     auto delta = [](float target, float current, float extent) {
         float d = target - current;
         if (d > extent / 2) d -= extent;
@@ -461,7 +462,7 @@ static void autopilot() {
     const float first_step = 8.0f * 0.02f * 0.02f;
     assert(std::fabs(delta(frames[0].x, start_x, MATRIX_WIDTH) - dx / distance * first_step) < 0.0001f);
     assert(std::fabs(delta(frames[0].y, start_y, MATRIX_HEIGHT) - dy / distance * first_step) < 0.0001f);
-    assert(frames[1].x == 6 && frames[1].y == 4); // Independent timer.
+    assert(frames[1].x == other_start_x && frames[1].y == other_start_y); // Independent timer.
     const float auto_x = frames[0].x, auto_y = frames[0].y;
     assert(updateJoystick(401, 0, 0) && updateJoystick(402, 0, 0));
     updatePlayerFrames(8020000, frames, MAX_PLAYERS, &vitamin);
@@ -488,7 +489,6 @@ static void autopilot() {
     assert(getPlayerState(401, state) && state.score == 1);
     assert(getPlayerState(402, state) && state.score == 0);
     float previous_x = frames[0].x, previous_y = frames[0].y;
-    float previous_travel = 100;
     bool coasted = false;
     for (unsigned step = 0; step < 100; ++step) {
         now += 20000;
@@ -496,12 +496,13 @@ static void autopilot() {
         updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
         const float travel = std::hypot(delta(frames[0].x, previous_x, MATRIX_WIDTH),
                                         delta(frames[0].y, previous_y, MATRIX_HEIGHT));
-        assert(travel <= previous_travel + 0.00001f);
+        assert(travel > 0 && travel <= 0.401f);
+        assert(frames[0].x >= 0 && frames[0].x <= MATRIX_WIDTH - 1);
+        assert(frames[0].y >= 0 && frames[0].y <= MATRIX_HEIGHT - 1);
         coasted |= travel > 0;
-        previous_travel = travel;
         previous_x = frames[0].x; previous_y = frames[0].y;
     }
-    assert(coasted && previous_travel == 0);
+    assert(coasted);
     now += 1000000; // The next vitamin appears after the three-second pause.
     assert(updateJoystick(402, 0, 0));
     updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
@@ -512,14 +513,14 @@ static void autopilot() {
     updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
     const float restart_travel = std::hypot(delta(frames[0].x, rest_x, MATRIX_WIDTH),
                                             delta(frames[0].y, rest_y, MATRIX_HEIGHT));
-    assert(restart_travel > 0 && restart_travel < 0.004f);
+    assert(restart_travel > 0 && restart_travel < 0.05f);
     const float next_x = frames[0].x, next_y = frames[0].y;
     now += 20000;
     assert(updateJoystick(402, 0, 0));
     updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
     const float accelerating_travel = std::hypot(delta(frames[0].x, next_x, MATRIX_WIDTH),
                                                  delta(frames[0].y, next_y, MATRIX_HEIGHT));
-    assert(accelerating_travel > restart_travel && accelerating_travel < 0.007f);
+    assert(accelerating_travel > 0 && accelerating_travel < 0.06f);
     removePlayer(401); removePlayer(402);
     assert(addPlayer(403));
     updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
@@ -528,6 +529,24 @@ static void autopilot() {
     updatePlayerFrames(0, frames, MAX_PLAYERS, &vitamin);
     assert(frames[0].x == 2 && frames[0].y == 4);
     removePlayer(403);
+}
+
+static void continuousAutopilot() {
+    player_frame_t frames[MAX_PLAYERS];
+    vitamin_frame_t vitamin;
+    updatePlayerFrames(0, frames, MAX_PLAYERS, &vitamin);
+    assert(addPlayer(501));
+    updatePlayerFrames(0, frames, MAX_PLAYERS, &vitamin);
+    float x = frames[0].x, y = frames[0].y;
+    for (uint64_t now = 20000; now <= 24000000; now += 20000) {
+        updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+        assert(frames[0].x >= 0 && frames[0].x <= MATRIX_WIDTH - 1);
+        assert(frames[0].y >= 0 && frames[0].y <= MATRIX_HEIGHT - 1);
+        const float travel = std::hypot(frames[0].x - x, frames[0].y - y);
+        if (now >= 3000000) assert(travel > 0.000001f && travel <= 0.401f);
+        x = frames[0].x; y = frames[0].y;
+    }
+    removePlayer(501);
 }
 
 static void boundedMovement() {
@@ -560,4 +579,5 @@ int main() {
     selfCuts(); puts("PASS: self-cut, retained tail, enclosed area value 5, edge crossing and reset");
     autopilot(); puts("PASS: three-second autopilot, direct direction, manual takeover, pickup, independent timers");
     boundedMovement(); puts("PASS: automatic edge bounds and manual wraparound");
+    continuousAutopilot(); puts("PASS: continuous automatic movement over multiple vitamin cycles");
 }

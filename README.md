@@ -68,7 +68,9 @@ zum aktuellen Vitamin. Er fährt direkt innerhalb der Matrix zum Ziel und
 überquert auch beim Ausrollen keine Ränder. Nur die manuelle Bewegung springt
 weiterhin auf die gegenüberliegende Seite. Der Wurm
 beschleunigt allmählich und bremst schon bei der Annäherung. Nach dem Einsammeln
-oder Ablauf des Vitamins rollt er sanft bis zum Stillstand aus. Zum nächsten
+oder Ablauf des Vitamins verlangsamt er auf eine ruhige Weiterfahrt mit zwei
+LED-Zellen pro Sekunde. Er bleibt im Automatikmodus auch ohne Vitamin in
+Bewegung und dreht vor den Rändern nach innen. Zum nächsten
 Vitamin beschleunigt er wieder langsam; auch Richtungswechsel erfolgen mit
 begrenzter Beschleunigung. Jede neue Joysticknachricht (auch die Neutralstellung) gibt
 die Steuerung sofort an den Spieler zurück und startet dessen Timer neu.

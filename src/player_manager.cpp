@@ -19,6 +19,8 @@ constexpr uint64_t VITAMIN_DELAY = 3000000;
 constexpr uint64_t AUTOPILOT_DELAY = 3000000;
 constexpr float AUTO_ACCELERATION = 8.0f; // LED cells / second squared.
 constexpr float AUTO_DECELERATION = 6.0f;
+constexpr float AUTO_CRUISE_SPEED = 2.0f;
+constexpr float AUTO_TURN_RATE = 3.0f; // radians / second.
 
 static void movePlayer(player_t &player, uint64_t now) {
     const bool reset_clock = !player.input_clock_started || now < player.last_frame;
@@ -33,27 +35,55 @@ static void movePlayer(player_t &player, uint64_t now) {
     float x = player.worm.joystick_x, y = player.worm.joystick_y;
     const bool automatic = now - player.last_input >= AUTOPILOT_DELAY;
     if (automatic) {
-        float wanted_x = 0, wanted_y = 0;
+        const float current_speed = std::hypot(player.velocity_x, player.velocity_y);
+        float wanted_x = current_speed > 0 ? player.velocity_x : 1.0f;
+        float wanted_y = current_speed > 0 ? player.velocity_y : 0.6f;
+        float wanted_speed = std::fmin(AUTO_CRUISE_SPEED, float(player.worm.nominal_speed));
         if (vitamin.active && now >= vitamin_since && now - vitamin_since < VITAMIN_LIFETIME_US) {
             const float dx = float(vitamin.x) - player.worm.x_position;
             const float dy = float(vitamin.y) - player.worm.y_position;
             const float distance = std::hypot(dx, dy);
-            // Begin braking before reaching the vitamin, then gently coast to rest.
-            const float wanted_speed = std::fmin(float(player.worm.nominal_speed),
-                std::sqrt(2 * AUTO_DECELERATION * std::fmax(0.0f, distance - 0.25f)));
+            // Slow near the vitamin, but continue cruising after collecting it.
+            wanted_speed = std::fmin(float(player.worm.nominal_speed),
+                std::fmax(wanted_speed, std::sqrt(2 * AUTO_DECELERATION * std::fmax(0.0f, distance - 0.25f))));
             if (distance > 0) {
                 wanted_x = dx / distance * wanted_speed;
                 wanted_y = dy / distance * wanted_speed;
             }
+        } else {
+            const float margin = std::fmax(1.5f, current_speed / AUTO_TURN_RATE + 0.5f);
+            if (player.worm.x_position < margin) wanted_x = std::fabs(wanted_x) + 1;
+            if (player.worm.x_position > MATRIX_WIDTH - 1 - margin) wanted_x = -std::fabs(wanted_x) - 1;
+            if (player.worm.y_position < margin) wanted_y = std::fabs(wanted_y) + 1;
+            if (player.worm.y_position > MATRIX_HEIGHT - 1 - margin) wanted_y = -std::fabs(wanted_y) - 1;
         }
-        const float change_x = wanted_x - player.velocity_x;
-        const float change_y = wanted_y - player.velocity_y;
-        const float change = std::hypot(change_x, change_y);
-        const float rate = std::hypot(wanted_x, wanted_y) < std::hypot(player.velocity_x, player.velocity_y)
-            ? AUTO_DECELERATION : AUTO_ACCELERATION;
-        const float fraction = change > 0 ? std::fmin(1.0f, rate * dt / change) : 0;
-        player.velocity_x += change_x * fraction;
-        player.velocity_y += change_y * fraction;
+        const float rate = wanted_speed < current_speed ? AUTO_DECELERATION : AUTO_ACCELERATION;
+        const float next_speed = current_speed + std::fmax(-rate * dt, std::fmin(rate * dt, wanted_speed - current_speed));
+        const float target_heading = std::atan2(wanted_y, wanted_x);
+        float heading = current_speed > 0 ? std::atan2(player.velocity_y, player.velocity_x) : target_heading;
+        const float turn = std::remainder(target_heading - heading, 2.0f * 3.14159265f);
+        heading += std::fmax(-AUTO_TURN_RATE * dt, std::fmin(AUTO_TURN_RATE * dt, turn));
+        player.velocity_x = std::cos(heading) * next_speed;
+        player.velocity_y = std::sin(heading) * next_speed;
+        // At an edge, slide along it instead of stopping or wrapping.
+        if (dt > 0) {
+            const float px = std::fmax(0.0f, std::fmin(float(MATRIX_WIDTH - 1), player.worm.x_position));
+            const float py = std::fmax(0.0f, std::fmin(float(MATRIX_HEIGHT - 1), player.worm.y_position));
+            const float bounded_x = std::fmax(-px / dt,
+                std::fmin((MATRIX_WIDTH - 1 - px) / dt, player.velocity_x));
+            const float bounded_y = std::fmax(-py / dt,
+                std::fmin((MATRIX_HEIGHT - 1 - py) / dt, player.velocity_y));
+            player.velocity_x = bounded_x; player.velocity_y = bounded_y;
+            if (next_speed > 0 && std::hypot(bounded_x, bounded_y) < 0.001f) {
+                const float inward_x = (MATRIX_WIDTH - 1) / 2.0f - player.worm.x_position;
+                const float inward_y = (MATRIX_HEIGHT - 1) / 2.0f - player.worm.y_position;
+                const float inward_length = std::hypot(inward_x, inward_y);
+                if (inward_length > 0) {
+                    player.velocity_x = inward_x / inward_length * next_speed;
+                    player.velocity_y = inward_y / inward_length * next_speed;
+                }
+            }
+        }
         const float speed = player.worm.nominal_speed;
         x = speed > 0 ? player.velocity_x / speed : 0;
         y = speed > 0 ? player.velocity_y / speed : 0;
