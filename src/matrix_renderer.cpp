@@ -37,8 +37,18 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
                             rgb_pixel_t ambient, const vitamin_frame_t *vitamin) {
     rgb_pixel_t heads[PIXEL_COUNT] = {};
     bool occupied[PIXEL_COUNT] = {};
+    rgb_pixel_t background[PIXEL_COUNT];
+    bool clear[PIXEL_COUNT] = {};
+    std::fill_n(background, PIXEL_COUNT, ambient);
     for (size_t i = 0; players != nullptr && i < count; ++i) {
         const auto &player = players[i];
+        const auto tint = playerColor(player.hue, 5);
+        for (unsigned cell = 0; cell < PIXEL_COUNT; ++cell) {
+            const auto physical = matrixPixelIndex(cell % MATRIX_WIDTH, cell / MATRIX_WIDTH);
+            const unsigned bit = 1u << (cell % 8);
+            if (player.area[cell / 8] & bit) background[physical] = tint;
+            if (player.cut[cell / 8] & bit) clear[physical] = true;
+        }
         if (!std::isfinite(player.x) || !std::isfinite(player.y) ||
             player.x < 0 || player.x >= MATRIX_WIDTH ||
             player.y < 0 || player.y >= MATRIX_HEIGHT) continue;
@@ -64,10 +74,12 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     for (size_t i = 0; i < PIXEL_COUNT; ++i) {
         if (occupied[i]) {
             frame_buffer[i] = heads[i];
+        } else if (clear[i]) {
+            frame_buffer[i] = background[i];
         } else {
             auto &pixel = frame_buffer[i];
-            pixel = {fade(pixel.r, ambient.r), fade(pixel.g, ambient.g),
-                     fade(pixel.b, ambient.b)};
+            pixel = {fade(pixel.r, background[i].r), fade(pixel.g, background[i].g),
+                     fade(pixel.b, background[i].b)};
         }
         output_buffer[i] = frame_buffer[i];
     }

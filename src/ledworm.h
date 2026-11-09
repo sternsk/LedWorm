@@ -5,6 +5,7 @@
 class LedWorm {
 public:
     static constexpr uint8_t MAX_LENGTH = 255;
+    static constexpr unsigned AREA_BYTES = 32; // 16 x 16 logical cells.
     float joystick_x = 0.0f;
     float joystick_y = 0.0f;
     float x_position = 0.0f;
@@ -22,6 +23,8 @@ public:
     uint8_t bodyCell(unsigned age) const {
         return path[(path_head + MAX_LENGTH - age) % MAX_LENGTH];
     }
+    const uint8_t *claimedArea() const { return area; }
+    const uint8_t *cutCells() const { return cut; }
 
 private:
     uint64_t last_move_time = 0;
@@ -29,5 +32,8 @@ private:
     uint8_t path[MAX_LENGTH] = {};
     unsigned path_head = 0;
     uint8_t path_count = 0;
+    uint8_t area[AREA_BYTES] = {};
+    uint8_t cut[AREA_BYTES] = {};
+    void encloseArea(uint8_t cell, unsigned intersection);
     void rememberPosition(float x, float y);
 };

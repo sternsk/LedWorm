@@ -22,8 +22,20 @@ ohne diesen Lock. Pro Frame werden alle Köpfe zusammengeführt und einmal an
 die Hardware gesendet. Überlappende Köpfe mischen ihre Farben; alte Positionen
 blenden zur gewählten Hintergrundfarbe aus. Beim Verbindungsende wird der
 Spielerplatz freigegeben. Die Wurmkörper bestehen aus den zuletzt besuchten
-LED-Zellen; dahinter bleibt ein ausblendender Schweif. Körperkollisionen sind
-noch nicht implementiert.
+LED-Zellen; dahinter bleibt ein ausblendender Schweif. Trifft der Kopf eine
+eigene Körperzelle, wird die gerade geschlossene Schleife entfernt. Der
+Schnittpunkt wird zum neuen Kopf, das ältere Schwanzstück bleibt erhalten.
+Die Länge sinkt um die Zahl der entfernten Segmente, mindestens auf 1;
+der Punktestand bleibt unverändert. Abgeschnittene Zellen verschwinden sofort.
+
+Die eingeschlossene Innenfläche bleibt für diese Spielerverbindung in der
+Wurmfarbe mit Value 5 eingefärbt. Schleifenränder zählen nicht zur Innenfläche.
+Köpfe, Körper und Vitamine werden darüber gezeichnet. Bei überlappenden Flächen
+bestimmt der später gezeichnete Spieler die Farbe; die Werte werden nicht addiert.
+Kleine Schleifen über Matrixränder werden lokal abgewickelt und korrekt gefüllt.
+Eine Schleife, die ganz um die Matrix läuft und keine eindeutige Innenfläche
+hat, verkürzt den Wurm ohne Flächenfärbung. Kollisionen mit anderen Würmern
+sind noch nicht implementiert.
 
 Spieler werden beim WebSocket-Handshake automatisch angelegt. Die Oberfläche
 zeigt die zugewiesene Spieler-ID, Spielerzahl und alle 200 ms den eigenen

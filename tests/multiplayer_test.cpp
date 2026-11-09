@@ -304,15 +304,112 @@ static void bodies() {
     }
     assert(visible == 5);
     // Long histories wrap their storage without corrupting segment order.
+    assert(worm.init(2));
+    worm.nominal_speed = 50;
     worm.length = LedWorm::MAX_LENGTH;
-    for (unsigned i = 1; i <= 300; ++i) worm.move(1, 0, 160000 + i * 20000);
+    worm.move(0, 0, 0);
+    uint64_t now = 0;
+    // A serpentine Hamiltonian cycle visits all cells without self-intersection.
+    for (unsigned i = 0; i < 600; ++i) {
+        const unsigned row = i / MATRIX_WIDTH;
+        const bool vertical = i % MATRIX_WIDTH == MATRIX_WIDTH - 1;
+        now += 20000;
+        worm.move(vertical ? 0 : (row % 2 ? -1 : 1), vertical ? 1 : 0, now);
+    }
     assert(worm.bodyCount() == LedWorm::MAX_LENGTH);
-    for (unsigned i = 1; i < worm.bodyCount(); ++i) {
-        assert(worm.bodyCell(i) / MATRIX_WIDTH == 4);
-        assert((worm.bodyCell(i - 1) % MATRIX_WIDTH + MATRIX_WIDTH - 1) % MATRIX_WIDTH ==
-               worm.bodyCell(i) % MATRIX_WIDTH);
+    bool seen[PIXEL_COUNT] = {};
+    for (unsigned i = 0; i < worm.bodyCount(); ++i) {
+        assert(!seen[worm.bodyCell(i)]);
+        seen[worm.bodyCell(i)] = true;
     }
     assert(worm.init(2) && worm.length == 8 && worm.bodyCount() == 0);
+}
+
+static void selfCuts() {
+    for (int offset : {0, 12}) { // Repeat the same enclosure across both edges.
+        LedWorm worm;
+        assert(worm.init(1));
+        worm.length = 20;
+        worm.nominal_speed = 50;
+        worm.x_position = (1 + offset) % MATRIX_WIDTH;
+        worm.y_position = (3 + offset) % MATRIX_HEIGHT;
+        uint64_t now = 0;
+        worm.move(0, 0, now);
+        auto walk = [&](int x, int y, unsigned cells) {
+            for (unsigned i = 0; i < cells; ++i) { now += 20000; worm.move(x, y, now); }
+        };
+        auto cell = [&](int x, int y) {
+            return unsigned((y + offset) % MATRIX_HEIGHT * MATRIX_WIDTH + (x + offset) % MATRIX_WIDTH);
+        };
+        auto filled = [&](unsigned c) { return (worm.claimedArea()[c / 8] & (1u << (c % 8))) != 0; };
+        walk(1, 0, 4);
+        walk(0, 1, 2);
+        walk(-1, 0, 2);
+        walk(0, -1, 2);
+        assert(worm.length == 13 && worm.bodyCount() == 3);
+        assert(worm.bodyCell(0) == cell(3, 3));
+        assert(worm.bodyCell(1) == cell(2, 3));
+        assert(worm.bodyCell(2) == cell(1, 3));
+        assert(filled(cell(4, 4)));
+        assert(!filled(cell(4, 3)) && !filled(cell(2, 4)));
+        player_frame_t frame = {1, worm.x_position, worm.y_position, 86, 63};
+        frame.body_count = worm.bodyCount();
+        for (unsigned i = 0; i < frame.body_count; ++i) frame.body[i] = worm.bodyCell(i);
+        for (unsigned i = 0; i < LedWorm::AREA_BYTES; ++i) {
+            frame.area[i] = worm.claimedArea()[i]; frame.cut[i] = worm.cutCells()[i];
+        }
+        MatrixRenderer renderer;
+        const unsigned removed = cell(4, 3);
+        player_frame_t old = {1, float(removed % MATRIX_WIDTH), float(removed / MATRIX_WIDTH), 86, 63};
+        renderer.render(&old, 1, {0, 0, 0});
+        renderer.render(&frame, 1, {0, 0, 0});
+        assert(renderer.pixels()[matrixPixelIndex(removed % MATRIX_WIDTH, removed / MATRIX_WIDTH)].g == 0);
+        for (unsigned i = 0; i < 20; ++i) renderer.render(&frame, 1, {0, 0, 0});
+        const unsigned logical = cell(4, 4);
+        const auto color = renderer.pixels()[matrixPixelIndex(logical % MATRIX_WIDTH, logical / MATRIX_WIDTH)];
+        assert(color.r == 0 && color.g == 5 && color.b == 0);
+        const auto head = renderer.pixels()[matrixPixelIndex(uint8_t(worm.x_position), uint8_t(worm.y_position))];
+        assert(head.g == 63);
+        walk(0, 0, 2);
+        assert(worm.length == 13 && filled(cell(4, 4)));
+        assert(worm.init(2));
+        for (unsigned i = 0; i < LedWorm::AREA_BYTES; ++i) assert(worm.claimedArea()[i] == 0);
+    }
+    // Reversing on a one-cell-wide path has no enclosed area and cannot underflow.
+    LedWorm worm;
+    worm.init(1); worm.nominal_speed = 50; worm.length = 2;
+    worm.move(0, 0, 0); worm.move(1, 0, 20000); worm.move(-1, 0, 40000);
+    assert(worm.length == 1 && worm.bodyCount() == 1);
+    for (unsigned i = 0; i < LedWorm::AREA_BYTES; ++i) assert(worm.claimedArea()[i] == 0);
+    worm.init(1); worm.length = 20;
+    worm.move(0, 0, 0);
+    for (unsigned i = 1; i <= MATRIX_WIDTH; ++i) worm.move(1, 0, i * 20000);
+    assert(worm.length == 5 && worm.bodyCount() == 1);
+    for (unsigned i = 0; i < LedWorm::AREA_BYTES; ++i) assert(worm.claimedArea()[i] == 0);
+
+    // Verify that the network snapshot and renderer snapshot receive the cut.
+    assert(addPlayer(301));
+    player_frame_t frames[MAX_PLAYERS];
+    uint64_t now = 0;
+    updatePlayerFrames(now, frames, MAX_PLAYERS);
+    for (const auto &direction : {std::pair<int,int>{1,0}, {0,1}, {-1,0}, {0,-1}}) {
+        assert(updateJoystick(301, direction.first, direction.second));
+        for (unsigned i = 0; i < 2; ++i) {
+            now += 50000;
+            updatePlayerFrames(now, frames, MAX_PLAYERS);
+        }
+    }
+    player_state_t state;
+    assert(getPlayerState(301, state) && state.length == 1 && state.score == 0);
+    const unsigned interior = 5 * MATRIX_WIDTH + 3;
+    assert(frames[0].area[interior / 8] & (1u << (interior % 8)));
+    assert(frames[0].body_count == 1);
+    removePlayer(301);
+    assert(addPlayer(302));
+    updatePlayerFrames(now, frames, MAX_PLAYERS);
+    assert(getPlayerState(302, state) && state.length == 8);
+    for (unsigned i = 0; i < LedWorm::AREA_BYTES; ++i) assert(frames[0].area[i] == 0);
+    removePlayer(302);
 }
 
 int main() {
@@ -321,4 +418,5 @@ int main() {
     rendering(); puts("PASS: Matrixmapping, mehrere Köpfe, Mischung und Fade");
     vitamins(); puts("PASS: vitamin timing, free spawn, pickup, per-player score, reconnect, overlay");
     bodies(); puts("PASS: growing bodies, stationary head, wraparound, ring storage and rendering");
+    selfCuts(); puts("PASS: self-cut, retained tail, enclosed area value 5, edge crossing and reset");
 }

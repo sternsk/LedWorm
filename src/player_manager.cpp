@@ -2,6 +2,7 @@
 #include <cmath>
 #include <limits>
 #include <random>
+#include <cstring>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
@@ -167,6 +168,8 @@ size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
                 player.worm.brightness};
             auto &frame = frames[count - 1];
             frame.body_count = player.worm.bodyCount();
+            memcpy(frame.area, player.worm.claimedArea(), sizeof(frame.area));
+            memcpy(frame.cut, player.worm.cutCells(), sizeof(frame.cut));
             for (unsigned segment = 0; segment < frame.body_count; ++segment) {
                 frame.body[segment] = player.worm.bodyCell(segment);
             }
