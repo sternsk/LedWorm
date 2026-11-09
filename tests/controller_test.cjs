@@ -2,19 +2,20 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const script = fs.readFileSync(`${__dirname}/../src/index.html`, 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-function client() {
+function client(options = {}) {
     const nodes = {};
     const sockets = [];
     const intervals = new Map();
     const timeouts = [];
     const window = {location:{protocol:'http:',host:'ledworm.test:8080'}, addEventListener(){}};
+    window.confirm = options.confirm || (() => false);
     class WebSocket {
         static OPEN = 1;
         constructor(url) { this.url = url; this.readyState = 1; this.sent = []; sockets.push(this); }
         send(value) { this.sent.push(JSON.parse(value)); }
     }
     vm.runInNewContext(script, {
-        window, WebSocket,
+        window, WebSocket, fetch: options.fetch,
         document:{getElementById(id) {
             return nodes[id] ??= {style:{},disabled:true,textContent:'',value:'63',listeners:{},
                 addEventListener(type, callback){this.listeners[type] = callback;}};
@@ -60,3 +61,48 @@ a.timeouts[0]();
 assert.equal(a.sockets.length, 2);
 assert.equal(a.nodes['value-slider'].disabled, true);
 console.log('PASS: per-client telemetry, numeric brightness commands, server confirmation, disconnect/reconnect');
+
+const modeClient = client();
+const modeState = {id:1,x:0,y:0,length:8,brightness:63,count:1};
+modeClient.receive({...modeState, can_reset_wifi:false});
+assert.equal(modeClient.nodes['wifi-reset-section'].hidden, true);
+assert.equal(modeClient.nodes['wifi-reset'].disabled, true);
+modeClient.receive({...modeState, can_reset_wifi:true});
+assert.equal(modeClient.nodes['wifi-reset-section'].hidden, false);
+assert.equal(modeClient.nodes['wifi-reset'].disabled, false);
+modeClient.socket.onclose();
+assert.equal(modeClient.nodes['wifi-reset-section'].hidden, true);
+assert.equal(modeClient.nodes['wifi-reset'].disabled, true);
+console.log('PASS: Wi-Fi reset visible only in station mode and hidden on disconnect');
+
+(async () => {
+    let requests = 0;
+    const cancelled = client({fetch: async () => { requests++; }});
+    cancelled.nodes['wifi-reset'].disabled = false;
+    await cancelled.nodes['wifi-reset'].listeners.click();
+    assert.equal(requests, 0);
+
+    const reset = client({confirm: () => true, fetch: async (url, options) => {
+        requests++;
+        assert.equal(url, '/api/wifi/reset');
+        assert.equal(options.method, 'POST');
+        assert.equal(options.headers['X-LedWorm-Reset'], 'confirm');
+        return {ok:true};
+    }});
+    reset.nodes['wifi-reset'].disabled = false;
+    await reset.nodes['wifi-reset'].listeners.click();
+    assert.equal(requests, 1);
+    assert.equal(reset.nodes['wifi-reset'].disabled, true);
+    assert.match(reset.nodes['wifi-reset-status'].textContent, /LedWorm-Setup/);
+    reset.socket.onclose();
+    assert.equal(reset.timeouts.length, 0);
+
+    for (const fetch of [async () => ({ok:false}), async () => { throw new Error('offline'); }]) {
+        const failed = client({confirm: () => true, fetch});
+        failed.nodes['wifi-reset'].disabled = false;
+        await failed.nodes['wifi-reset'].listeners.click();
+        assert.equal(failed.nodes['wifi-reset'].disabled, false);
+        assert.match(failed.nodes['wifi-reset-status'].textContent, /nicht bestätigt/);
+    }
+    console.log('PASS: Wi-Fi reset cancellation, POST, success, disconnect and failures');
+})().catch(error => { console.error(error); process.exitCode = 1; });

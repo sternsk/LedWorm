@@ -16,13 +16,44 @@ body{font:17px system-ui,sans-serif;background:#111827;color:#f9fafb;margin:0;pa
 <small>Für ein offenes WLAN leer lassen.</small>
 <button id="save">Speichern und verbinden</button>
 </form>
+<button type="button" id="offline">Offline spielen</button>
+<p>Spiele direkt im WLAN LedWorm-Setup, ohne Router oder Internet.
+Alle Mitspieler verbinden sich mit diesem WLAN und öffnen http://192.168.4.1/.
+Die Auswahl gilt bis zum Neustart; gespeicherte WLAN-Zugangsdaten bleiben erhalten.</p>
 <p id="status" role="status" aria-live="polite"></p>
 <small>Das Setup-WLAN ist offen. Richte LedWorm in einer vertrauenswürdigen Umgebung ein.</small>
 </main>
 <script>
 const status = document.querySelector('#status');
 const scanButton = document.querySelector('#scan');
+const offlineButton = document.querySelector('#offline');
+let switching = false;
+offlineButton.onclick = async () => {
+  if (switching) return;
+  switching = true;
+  offlineButton.disabled = scanButton.disabled = document.querySelector('#save').disabled = true;
+  status.textContent = 'Offline-Spiel wird gestartet … Bleibe mit LedWorm-Setup verbunden.';
+  try {
+    const response = await fetch('/api/offline', {method:'POST'});
+    if (!response.ok) throw new Error('Offline-Start fehlgeschlagen');
+    // The setup server hands port 80 to the game server. Wait until it is ready.
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        const game = await fetch('/play', {cache:'no-store'});
+        if (game.ok) { window.location.replace('/play'); return; }
+      } catch { /* brief interruption while the HTTP servers switch */ }
+    }
+    throw new Error('Spielserver nicht erreichbar');
+  } catch {
+    status.textContent = 'Offline-Start nicht bestätigt. Bleibe im WLAN LedWorm-Setup und öffne http://192.168.4.1/ erneut.';
+    switching = false;
+    offlineButton.disabled = scanButton.disabled = document.querySelector('#save').disabled = false;
+  }
+};
 scanButton.onclick = async () => {
+  if (switching) return;
+  offlineButton.disabled = true;
   scanButton.disabled = true;
   status.textContent = 'Suche läuft …';
   try {
@@ -34,17 +65,19 @@ scanButton.onclick = async () => {
     }));
     status.textContent = names.length ? 'WLAN-Name auswählen oder eingeben.' : 'Kein WLAN gefunden. Du kannst den Namen manuell eingeben.';
   } catch (error) { status.textContent = 'Suche fehlgeschlagen. Bitte erneut versuchen oder WLAN-Namen eingeben.'; }
-  finally { scanButton.disabled = false; }
+  finally { scanButton.disabled = offlineButton.disabled = false; }
 };
 document.querySelector('#setup').onsubmit = async event => {
   event.preventDefault();
+  if (switching) return;
   const ssid = document.querySelector('#ssid').value;
   const password = document.querySelector('#password').value;
   const bytes = value => new TextEncoder().encode(value).length;
   if (bytes(ssid) < 1 || bytes(ssid) > 32 || (bytes(password) !== 0 && (bytes(password) < 8 || bytes(password) > 63))) {
     status.textContent = 'WLAN-Name: 1–32 Bytes. Passwort: leer oder 8–63 Bytes.'; return;
   }
-  const save = document.querySelector('#save'); save.disabled = true; scanButton.disabled = true;
+  switching = true;
+  const save = document.querySelector('#save'); save.disabled = true; scanButton.disabled = true; offlineButton.disabled = true;
   try {
     const response = await fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ssid,password})});
     if (!response.ok) throw new Error(await response.text());
@@ -52,7 +85,8 @@ document.querySelector('#setup').onsubmit = async event => {
     status.textContent = 'Gespeichert. LedWorm startet neu.\nVerbinde dieses Gerät wieder mit deinem Heimnetz. Öffne http://ledworm.local/ im Browser. Falls der Name nicht aufgelöst wird, findest du die IP-Adresse im Router oder im seriellen Monitor.\nFalls die Verbindung scheitert, erscheint nach etwa 30 Sekunden wieder LedWorm-Setup.';
   } catch (error) {
     status.textContent = 'Speichern nicht bestätigt. Falls LedWorm bereits neu startet, prüfe dein Heimnetz. Sonst erneut versuchen.';
-    save.disabled = false; scanButton.disabled = false;
+    switching = false;
+    save.disabled = false; scanButton.disabled = false; offlineButton.disabled = false;
   }
 };
 </script>

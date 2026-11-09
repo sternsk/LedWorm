@@ -70,6 +70,22 @@ ersetzen keinen Firmware-Build oder Funktionstest am ESP32.
 
 ## WLAN einrichten
 
+### Offline spielen
+
+Im WLAN `LedWorm-Setup` unter **http://192.168.4.1/** die Schaltfläche
+**Offline spielen** wählen. Die Seite öffnet automatisch den Controller.
+LedWorm bleibt als offener Access Point aktiv; bis zu acht Geräte können
+sich direkt verbinden und unter **http://192.168.4.1/** spielen. Ein Router
+oder Internetzugang ist nicht nötig. Falls das Bediengerät wegen fehlendem
+Internetzugang nachfragt, die Verbindung zu diesem WLAN beibehalten.
+
+Die Auswahl gilt bis zum Neustart und verändert keine gespeicherten
+WLAN-Zugangsdaten. Nach einem Neustart gilt wieder der normale Ablauf:
+Verbindung zum gespeicherten WLAN oder Setup. Ohne gespeicherte Daten
+kann im Setup erneut **Offline spielen** gewählt werden.
+
+### Verbindung mit einem WLAN
+
 Ohne gespeicherte Zugangsdaten bietet der ESP32 das offene WLAN
 `LedWorm-Setup` an. Damit verbinden und **http://192.168.4.1/** öffnen
 (kein automatisches Captive Portal). Dort WLANs suchen oder die SSID manuell
@@ -108,6 +124,14 @@ Event-Handler melden nur den Verbindungsstatus. `main.cpp` startet den
 Spielserver erst nach IP-Bezug und stoppt ihn vor dem Setup-Server; beide
 verwenden exklusiv Port 80. Der LED-Task läuft auch während des Setups weiter.
 Die WLAN-Suche blockiert ausschließlich den separaten Setup-HTTP-Task.
+
+Im Controller gibt es beim Spielen über das Heimnetz die Schaltfläche
+**WLAN zurücksetzen**. Im Offline-Spiel ist sie ausgeblendet und der
+Reset-Endpunkt lehnt Aufrufe ab. Nach Bestätigung
+werden die gespeicherten WLAN-Zugangsdaten gelöscht und LedWorm startet neu;
+alle Spieler werden getrennt. Danach mit `LedWorm-Setup` verbinden und
+**http://192.168.4.1/** öffnen, um das WLAN erneut einzurichten. Andere NVS-Daten
+bleiben erhalten. Der Aufruf erfolgt über `POST /api/wifi/reset` am Spielserver.
 
 `wifi_manager_reset()` löscht nur den Schlüssel im Namespace `ledworm_wifi`
 und plant einen Neustart. Die Funktion kann später aus einem entprellten

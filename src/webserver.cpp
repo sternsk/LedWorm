@@ -2,6 +2,8 @@
 #include "webserver.h"
 #include "player_manager.h"
 #include "globals.h"
+#include "wifi_manager.h"
+#include "esp_wifi.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -17,16 +19,41 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 // Maximale Anzahl der HTTP-Sessions merken
 static size_t max_open_sockets = 0;
 
+static esp_err_t reset_wifi_handler(httpd_req_t *req) {
+    wifi_mode_t mode;
+    if (esp_wifi_get_mode(&mode) != ESP_OK || mode != WIFI_MODE_STA) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                   "WLAN-Reset ist im Offline-Spiel nicht verfuegbar");
+    }
+    // Require an explicit same-origin GUI request, not a cross-site form POST.
+    char confirmation[8] = {};
+    if (httpd_req_get_hdr_value_str(req, "X-LedWorm-Reset", confirmation,
+                                   sizeof(confirmation)) != ESP_OK ||
+        strcmp(confirmation, "confirm") != 0) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bestaetigung fehlt");
+    }
+    if (wifi_manager_reset() != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "WLAN konnte nicht zurueckgesetzt werden");
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, "{\"reset\":true}");
+}
+
 // Only the requesting socket receives its own authoritative player snapshot.
 static esp_err_t send_player_state(httpd_req_t *req) {
     player_state_t state;
     if (!getPlayerState(httpd_req_to_sockfd(req), state)) return ESP_FAIL;
+    wifi_mode_t mode;
+    const bool can_reset_wifi = esp_wifi_get_mode(&mode) == ESP_OK && mode == WIFI_MODE_STA;
     char json[256];
     int length = snprintf(json, sizeof(json),
         "{\"type\":\"player_state\",\"id\":%lu,\"x\":%.3f,\"y\":%.3f,"
-        "\"length\":%u,\"brightness\":%u,\"count\":%u}",
+        "\"length\":%u,\"brightness\":%u,\"count\":%u,\"can_reset_wifi\":%s}",
         static_cast<unsigned long>(state.player_id), state.x, state.y,
-        unsigned(state.length), unsigned(state.brightness), unsigned(state.active_players));
+        unsigned(state.length), unsigned(state.brightness), unsigned(state.active_players),
+        can_reset_wifi ? "true" : "false");
     if (length < 0 || size_t(length) >= sizeof(json)) return ESP_FAIL;
     httpd_ws_frame_t frame = {};
     frame.type = HTTPD_WS_TYPE_TEXT;
@@ -38,6 +65,7 @@ static esp_err_t send_player_state(httpd_req_t *req) {
 // URI Handler für die Website (GET /)
 static esp_err_t get_index_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     // Berechne die Dateigröße anhand der Start- und End-Zeiger
     size_t index_html_len = index_html_end - index_html_start;
 
@@ -164,6 +192,15 @@ httpd_handle_t start_webserver(void) {
             .user_ctx  = NULL
         };
         httpd_register_uri_handler(server, &index_uri);
+        httpd_uri_t play_uri = index_uri;
+        play_uri.uri = "/play";
+        httpd_register_uri_handler(server, &play_uri);
+
+        httpd_uri_t reset_uri = {};
+        reset_uri.uri = "/api/wifi/reset";
+        reset_uri.method = HTTP_POST;
+        reset_uri.handler = reset_wifi_handler;
+        httpd_register_uri_handler(server, &reset_uri);
 
         // Route für WebSocket
         httpd_uri_t ws_uri = {

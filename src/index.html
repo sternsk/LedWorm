@@ -151,6 +151,12 @@
         </div>
     </div>
 
+    <div class="container status-box" id="wifi-reset-section" hidden>
+        <button type="button" id="wifi-reset" disabled>WLAN zurücksetzen</button>
+        <p>Entfernt die gespeicherten WLAN-Zugangsdaten und startet LedWorm neu.</p>
+        <p id="wifi-reset-status" role="status" aria-live="polite"></p>
+    </div>
+
     <div class="bottom-controls">
         <div id="joystick-zone">
             <div id="joystick-stick"></div>
@@ -165,6 +171,30 @@
     
     <script>
         let ws;
+        let wifiResetComplete = false;
+        let wifiResetPending = false;
+        const wifiResetButton = document.getElementById('wifi-reset');
+        const wifiResetStatus = document.getElementById('wifi-reset-status');
+        const wifiResetSection = document.getElementById('wifi-reset-section');
+        wifiResetButton.addEventListener('click', async () => {
+            if (wifiResetButton.disabled || !window.confirm(
+                'WLAN-Zugangsdaten löschen und LedWorm neu starten? Alle Spieler werden getrennt.')) return;
+            wifiResetButton.disabled = true;
+            wifiResetPending = true;
+            wifiResetStatus.textContent = 'WLAN wird zurückgesetzt …';
+            try {
+                const response = await fetch('/api/wifi/reset', {
+                    method: 'POST', headers: {'X-LedWorm-Reset': 'confirm'}
+                });
+                if (!response.ok) throw new Error('reset failed');
+                wifiResetComplete = true;
+                wifiResetStatus.textContent = 'WLAN gelöscht. LedWorm startet neu. Verbinde dich mit LedWorm-Setup und öffne http://192.168.4.1/.';
+            } catch {
+                wifiResetPending = false;
+                wifiResetStatus.textContent = 'Zurücksetzen nicht bestätigt. Prüfe, ob LedWorm-Setup verfügbar ist, oder versuche es erneut.';
+                wifiResetButton.disabled = false;
+            }
+        });
         const stick = document.getElementById('joystick-stick');
         const zone = document.getElementById('joystick-zone');
         const playerCount = document.getElementById('player-count');
@@ -198,6 +228,8 @@
                 let data;
                 try { data = JSON.parse(event.data); } catch { return; }
                 if (data.type !== 'player_state') return;
+                wifiResetSection.hidden = data.can_reset_wifi !== true;
+                wifiResetButton.disabled = data.can_reset_wifi !== true || wifiResetPending || wifiResetComplete;
                 haveState = true;
                 playerCount.textContent = data.count;
                 myIdRow.style.display = 'flex';
@@ -213,6 +245,8 @@
             };
             ws.onclose = () => {
                 clearInterval(stateTimer);
+                wifiResetSection.hidden = true;
+                wifiResetButton.disabled = true;
                 haveState = false;
                 active = false;
                 adjustingBrightness = false;
@@ -223,7 +257,11 @@
                 wormPosition.textContent = wormLength.textContent = wormBrightness.textContent = '–';
                 brightnessPreview.textContent = '–';
                 valueSlider.disabled = true;
-                setTimeout(initWebSocket, 2000);
+                if (wifiResetComplete) {
+                    connectionState.textContent = 'WLAN zurückgesetzt';
+                } else {
+                    setTimeout(initWebSocket, 2000);
+                }
             };
         }
 
