@@ -80,7 +80,10 @@ oder Internetzugang ist nicht nötig. Falls das Bediengerät wegen fehlendem
 Internetzugang nachfragt, die Verbindung zu diesem WLAN beibehalten.
 
 Die Auswahl gilt bis zum Neustart und verändert keine gespeicherten
-WLAN-Zugangsdaten. Nach einem Neustart gilt wieder der normale Ablauf:
+WLAN-Zugangsdaten. Über **WLAN-Auswahl** im Offline-Controller geht es direkt
+zurück ins Setup. Dabei werden die Spieler getrennt, das Setup-WLAN bleibt
+aktiv und gespeicherte Zugangsdaten bleiben erhalten.
+Nach einem Neustart gilt wieder der normale Ablauf:
 Verbindung zum gespeicherten WLAN oder Setup. Ohne gespeicherte Daten
 kann im Setup erneut **Offline spielen** gewählt werden.
 
@@ -126,8 +129,8 @@ verwenden exklusiv Port 80. Der LED-Task läuft auch während des Setups weiter.
 Die WLAN-Suche blockiert ausschließlich den separaten Setup-HTTP-Task.
 
 Im Controller gibt es beim Spielen über das Heimnetz die Schaltfläche
-**WLAN zurücksetzen**. Im Offline-Spiel ist sie ausgeblendet und der
-Reset-Endpunkt lehnt Aufrufe ab. Nach Bestätigung
+**WLAN zurücksetzen**. Im Offline-Spiel heißt sie **WLAN-Auswahl** und öffnet
+stattdessen das Setup; der Reset-Endpunkt lehnt dort Aufrufe ab. Nach Bestätigung
 werden die gespeicherten WLAN-Zugangsdaten gelöscht und LedWorm startet neu;
 alle Spieler werden getrennt. Danach mit `LedWorm-Setup` verbinden und
 **http://192.168.4.1/** öffnen, um das WLAN erneut einzurichten. Andere NVS-Daten

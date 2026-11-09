@@ -16,7 +16,7 @@
 #include "nvs_flash.h"
 
 namespace {
-constexpr EventBits_t CONNECTED = BIT0, REBOOT = BIT1, OFFLINE = BIT2;
+constexpr EventBits_t CONNECTED = BIT0, REBOOT = BIT1, OFFLINE = BIT2, SELECT_WIFI = BIT3;
 constexpr TickType_t CONNECTION_TIMEOUT = pdMS_TO_TICKS(30000);
 const char *TAG = "wifi_manager";
 EventGroupHandle_t events;
@@ -162,23 +162,25 @@ esp_err_t offline(httpd_req_t *req) {
     return result;
 }
 
-void setup() {
+void setup(bool keep_ap = false) {
     if (mdns_running) {
         mdns_free();
         mdns_running = false;
     }
-    ESP_ERROR_CHECK(esp_wifi_stop());
+    if (!keep_ap) ESP_ERROR_CHECK(esp_wifi_stop());
     // STA interface enables scanning; no automatic connection attempts in setup.
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-    wifi_config_t config = {};
-    const char *name = "LedWorm-Setup";
-    memcpy(config.ap.ssid, name, strlen(name));
-    config.ap.ssid_len = strlen(name);
-    config.ap.channel = 1;
-    config.ap.max_connection = MAX_PLAYERS;
-    config.ap.authmode = WIFI_AUTH_OPEN;
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    if (!keep_ap) {
+        wifi_config_t config = {};
+        const char *name = "LedWorm-Setup";
+        memcpy(config.ap.ssid, name, strlen(name));
+        config.ap.ssid_len = strlen(name);
+        config.ap.channel = 1;
+        config.ap.max_connection = MAX_PLAYERS;
+        config.ap.authmode = WIFI_AUTH_OPEN;
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &config));
+        ESP_ERROR_CHECK(esp_wifi_start());
+    }
     httpd_config_t http = HTTPD_DEFAULT_CONFIG();
     http.max_open_sockets = 4;
     http.stack_size = 8192;
@@ -190,6 +192,8 @@ void setup() {
     httpd_uri_t credentials = {}; credentials.uri = "/api/wifi"; credentials.method = HTTP_POST; credentials.handler = save;
     httpd_uri_t play = {}; play.uri = "/api/offline"; play.method = HTTP_POST; play.handler = offline;
     ESP_ERROR_CHECK(httpd_register_uri_handler(setup_server, &root));
+    httpd_uri_t selection = root; selection.uri = "/setup";
+    ESP_ERROR_CHECK(httpd_register_uri_handler(setup_server, &selection));
     ESP_ERROR_CHECK(httpd_register_uri_handler(setup_server, &networks));
     ESP_ERROR_CHECK(httpd_register_uri_handler(setup_server, &credentials));
     ESP_ERROR_CHECK(httpd_register_uri_handler(setup_server, &play));
@@ -218,6 +222,7 @@ void manager(void *) {
         if (provisioning && !playing_offline && (bits & OFFLINE)) {
             // Stop from the manager task: httpd_stop waits for the POST handler.
             ESP_ERROR_CHECK(httpd_stop(setup_server));
+            xEventGroupClearBits(events, OFFLINE);
             setup_server = nullptr;
             // Keep the AP running and its clients associated; disable station mode.
             ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
@@ -225,6 +230,13 @@ void manager(void *) {
             serving = true;
             playing_offline = true;
             ESP_LOGI(TAG, "Offline-Spiel unter http://192.168.4.1/");
+        }
+        if (playing_offline && (bits & SELECT_WIFI)) {
+            notify(false);
+            xEventGroupClearBits(events, SELECT_WIFI);
+            serving = false;
+            setup(true);
+            playing_offline = false;
         }
         TickType_t now = xTaskGetTickCount();
         if (!provisioning) {
@@ -280,4 +292,14 @@ esp_err_t wifi_manager_reset() {
     esp_err_t err = store(nullptr);
     if (err == ESP_OK) xEventGroupSetBits(events, REBOOT);
     return err;
+}
+
+esp_err_t wifi_manager_select_wifi() {
+    if (!events) return ESP_ERR_INVALID_STATE;
+    wifi_mode_t mode;
+    esp_err_t err = esp_wifi_get_mode(&mode);
+    if (err != ESP_OK) return err;
+    if (mode != WIFI_MODE_AP) return ESP_ERR_INVALID_STATE;
+    xEventGroupSetBits(events, SELECT_WIFI);
+    return ESP_OK;
 }

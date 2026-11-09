@@ -7,7 +7,7 @@ function client(options = {}) {
     const sockets = [];
     const intervals = new Map();
     const timeouts = [];
-    const window = {location:{protocol:'http:',host:'ledworm.test:8080'}, addEventListener(){}};
+    const window = {location:{protocol:'http:',host:'ledworm.test:8080',replace(value){window.destination=value;}}, addEventListener(){}};
     window.confirm = options.confirm || (() => false);
     class WebSocket {
         static OPEN = 1;
@@ -22,12 +22,12 @@ function client(options = {}) {
         }},
         setInterval(fn) { const id = intervals.size + 1; intervals.set(id,fn); return id; },
         clearInterval(id) { intervals.delete(id); },
-        setTimeout(fn) { timeouts.push(fn); }
+        setTimeout(fn) { if (options.immediateTimers) fn(); else timeouts.push(fn); }
     });
     window.onload();
     const socket = sockets[0]; socket.onopen();
     const receive = (state) => socket.onmessage({data:JSON.stringify({type:'player_state', ...state})});
-    return {nodes,sockets,socket,intervals,timeouts,receive};
+    return {nodes,sockets,socket,intervals,timeouts,receive,window};
 }
 const a = client(), b = client();
 assert.equal(a.socket.url, 'ws://ledworm.test:8080/ws');
@@ -65,17 +65,44 @@ console.log('PASS: per-client telemetry, numeric brightness commands, server con
 const modeClient = client();
 const modeState = {id:1,x:0,y:0,length:8,brightness:63,count:1};
 modeClient.receive({...modeState, can_reset_wifi:false});
-assert.equal(modeClient.nodes['wifi-reset-section'].hidden, true);
-assert.equal(modeClient.nodes['wifi-reset'].disabled, true);
+assert.equal(modeClient.nodes['wifi-reset-section'].hidden, false);
+assert.equal(modeClient.nodes['wifi-reset'].disabled, false);
+assert.equal(modeClient.nodes['wifi-reset'].textContent, 'WLAN-Auswahl');
 modeClient.receive({...modeState, can_reset_wifi:true});
 assert.equal(modeClient.nodes['wifi-reset-section'].hidden, false);
 assert.equal(modeClient.nodes['wifi-reset'].disabled, false);
+assert.equal(modeClient.nodes['wifi-reset'].textContent, 'WLAN zurücksetzen');
 modeClient.socket.onclose();
 assert.equal(modeClient.nodes['wifi-reset-section'].hidden, true);
 assert.equal(modeClient.nodes['wifi-reset'].disabled, true);
-console.log('PASS: Wi-Fi reset visible only in station mode and hidden on disconnect');
+console.log('PASS: Wi-Fi button selects setup offline, resets in station mode, hides on disconnect');
 
 (async () => {
+    const state = {id:1,x:0,y:0,length:8,brightness:63,count:1,can_reset_wifi:false};
+    const selectionRequests = [];
+    let polls = 0;
+    const selection = client({confirm:()=>true, immediateTimers:true, fetch:async (url, options) => {
+        selectionRequests.push({url,options});
+        if (url === '/setup') return {ok:++polls >= 2};
+        assert.equal(url, '/api/wifi/select');
+        assert.equal(options.method, 'POST');
+        return {ok:true};
+    }});
+    selection.receive(state);
+    await selection.nodes['wifi-reset'].listeners.click();
+    assert.equal(selection.window.destination, '/setup');
+    assert.equal(selectionRequests.length, 3);
+    assert.equal(selection.nodes['wifi-reset'].disabled, true);
+    selection.socket.onclose();
+    assert.equal(selection.sockets.length, 1);
+    for (const fetch of [async()=>({ok:false}), async()=>{throw new Error('offline');}]) {
+        const failedSelection = client({confirm:()=>true, immediateTimers:true, fetch});
+        failedSelection.receive(state);
+        await failedSelection.nodes['wifi-reset'].listeners.click();
+        assert.equal(failedSelection.nodes['wifi-reset'].disabled, false);
+        assert.match(failedSelection.nodes['wifi-reset-status'].textContent, /nicht bestätigt/);
+    }
+    console.log('PASS: offline WLAN selection, readiness retry, redirect and errors');
     let requests = 0;
     const cancelled = client({fetch: async () => { requests++; }});
     cancelled.nodes['wifi-reset'].disabled = false;

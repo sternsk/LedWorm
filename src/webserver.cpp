@@ -41,6 +41,16 @@ static esp_err_t reset_wifi_handler(httpd_req_t *req) {
     return httpd_resp_sendstr(req, "{\"reset\":true}");
 }
 
+static esp_err_t select_wifi_handler(httpd_req_t *req) {
+    if (wifi_manager_select_wifi() != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                  "WLAN-Auswahl nur im Offline-Spiel verfuegbar");
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, "{\"setup\":true}");
+}
+
 // Only the requesting socket receives its own authoritative player snapshot.
 static esp_err_t send_player_state(httpd_req_t *req) {
     player_state_t state;
@@ -201,6 +211,11 @@ httpd_handle_t start_webserver(void) {
         reset_uri.method = HTTP_POST;
         reset_uri.handler = reset_wifi_handler;
         httpd_register_uri_handler(server, &reset_uri);
+        httpd_uri_t selection_uri = {};
+        selection_uri.uri = "/api/wifi/select";
+        selection_uri.method = HTTP_POST;
+        selection_uri.handler = select_wifi_handler;
+        httpd_register_uri_handler(server, &selection_uri);
 
         // Route für WebSocket
         httpd_uri_t ws_uri = {

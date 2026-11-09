@@ -9,3 +9,5 @@ esp_err_t wifi_manager_start(wifi_manager_callback_t callback);
 // For a future long-press handler. Task context only; clears only Wi-Fi credentials
 // and schedules a reboot. Returns an error if storage could not be updated.
 esp_err_t wifi_manager_reset();
+// Return from offline play to setup without deleting credentials or stopping AP.
+esp_err_t wifi_manager_select_wifi();
