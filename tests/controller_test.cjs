@@ -32,9 +32,10 @@ function client(options = {}) {
 const a = client(), b = client();
 assert.equal(a.socket.url, 'ws://ledworm.test:8080/ws');
 assert.equal(a.socket.sent[0].type, 'state');
-a.receive({id:1,x:2.25,y:4.5,length:8,brightness:63,count:2});
-b.receive({id:2,x:6,y:12,length:8,brightness:200,count:2});
-assert.equal(a.nodes['worm-position'].textContent, '2.25 / 4.50');
+a.receive({id:1,score:0,length:8,brightness:63,count:2});
+b.receive({id:2,score:7,length:8,brightness:200,count:2});
+assert.equal(a.nodes['worm-score'].textContent, 0);
+assert.equal(b.nodes['worm-score'].textContent, 7);
 assert.equal(a.nodes['worm-length'].textContent, 8);
 assert.equal(a.nodes['value-slider'].disabled, false);
 a.nodes['value-slider'].listeners.input({target:{value:'0'}});
@@ -42,7 +43,9 @@ assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))), {type:'value'
 assert.equal(a.nodes['brightness-preview'].textContent, 0);
 // Confirmed brightness only changes when the server acknowledges it.
 assert.equal(a.nodes['worm-brightness'].textContent, '63 (25 %)');
-a.receive({id:1,x:3,y:4.5,length:8,brightness:0,count:2});
+a.receive({id:1,score:1,length:8,brightness:0,count:2});
+assert.equal(a.nodes['worm-score'].textContent, 1);
+assert.equal(b.nodes['worm-score'].textContent, 7);
 assert.equal(a.nodes['worm-brightness'].textContent, '0 (0 %)');
 assert.equal(b.nodes['worm-brightness'].textContent, '200 (78 %)');
 assert.equal(b.socket.sent.length, 1);
@@ -52,7 +55,7 @@ assert.equal(a.socket.sent.at(-1).type, 'state');
 a.socket.readyState = 3; a.socket.onclose();
 assert.equal(a.intervals.size, 0);
 assert.equal(a.nodes['value-slider'].disabled, true);
-assert.equal(a.nodes['worm-position'].textContent, '–');
+assert.equal(a.nodes['worm-score'].textContent, '–');
 assert.equal(a.nodes['worm-brightness'].textContent, '–');
 const sentBefore = a.socket.sent.length;
 a.nodes['value-slider'].listeners.input({target:{value:'255'}});

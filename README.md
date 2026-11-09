@@ -26,7 +26,7 @@ implementierten Spielkörper oder Kollisionen.
 
 Spieler werden beim WebSocket-Handshake automatisch angelegt. Die Oberfläche
 zeigt die zugewiesene Spieler-ID, Spielerzahl und alle 200 ms den eigenen
-Serverzustand: Position X/Y, konfigurierte Länge und Helligkeit (0–255 sowie
+Serverzustand: Punktezahl, konfigurierte Länge und Helligkeit (0–255 sowie
 Prozent). Die konfigurierte Länge beträgt aktuell 8; der sichtbare Schweif ist
 weiterhin ein Fade und kein Segmentkörper dieser Länge.
 
@@ -40,8 +40,25 @@ bis zur erneuten Anmeldung deaktiviert.
 
 WebSocket-Nachrichten: `{"type":"value","value":128}` setzt eine ganzzahlige
 Helligkeit; `{"type":"state"}` fragt einen unveränderlichen Snapshot ab.
-`player_state` liefert `id`, `x`, `y`, `length`, `brightness` und `count`.
+`player_state` liefert `id`, `x`, `y`, `length`, `brightness`, `count`, `score`
+und `can_reset_wifi`. Die Position bleibt im Protokoll verfügbar; das GUI zeigt
+stattdessen den eigenen Punktestand.
 Ein Helligkeitskommando erhält ebenfalls den bestätigten Serverzustand zurück.
+
+## Vitamine und Punkte
+
+Solange Spieler verbunden sind, erscheint nach fünf Sekunden ein weißes Vitamin
+auf einer zufälligen LED, die von keinem Kopf belegt ist. Es bleibt bis zu acht
+Sekunden sichtbar. Erreicht ein Wurmkopf diese LED, verschwindet das Vitamin und
+der Spieler erhält einen Punkt. Treffen mehrere Köpfe im selben Frame ein,
+bekommt der erste aktive Spieler in der internen Slot-Reihenfolge den Punkt.
+Nach Einsammeln oder Ablauf erscheint nach drei Sekunden das nächste Vitamin.
+Es ist immer höchstens eines aktiv; Vitamine hinterlassen keinen Schweif.
+
+Die Punkte werden unter demselben Mutex wie die Bewegung auf dem ESP32 verwaltet.
+Sie gelten pro Spielerverbindung und starten bei einer neuen Anmeldung bei null.
+Ohne Spieler werden keine Vitamine angezeigt. Die Regeln gelten sowohl im
+Heimnetz als auch beim Offline-Spiel.
 
 ## Build und Tests
 
@@ -177,7 +194,7 @@ node tests/controller_test.cjs
 ```
 
 Am Gerät mit zwei Browsern prüfen: nur der eigene Wurm ändert seine Helligkeit,
-Positionen werden während der Bewegung aktualisiert, und nach einer Trennung
+Punkte werden beim Einsammeln aktualisiert, und nach einer Trennung
 erscheinen bis zum erneuten Verbindungsaufbau keine alten Werte.
 
 mDNS am Gerät prüfen: Nach dem WLAN-Start `http://ledworm.local/` auf einem

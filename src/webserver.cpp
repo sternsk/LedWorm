@@ -60,9 +60,10 @@ static esp_err_t send_player_state(httpd_req_t *req) {
     char json[256];
     int length = snprintf(json, sizeof(json),
         "{\"type\":\"player_state\",\"id\":%lu,\"x\":%.3f,\"y\":%.3f,"
-        "\"length\":%u,\"brightness\":%u,\"count\":%u,\"can_reset_wifi\":%s}",
+        "\"length\":%u,\"brightness\":%u,\"count\":%u,\"score\":%lu,\"can_reset_wifi\":%s}",
         static_cast<unsigned long>(state.player_id), state.x, state.y,
         unsigned(state.length), unsigned(state.brightness), unsigned(state.active_players),
+        static_cast<unsigned long>(state.score),
         can_reset_wifi ? "true" : "false");
     if (length < 0 || size_t(length) >= sizeof(json)) return ESP_FAIL;
     httpd_ws_frame_t frame = {};

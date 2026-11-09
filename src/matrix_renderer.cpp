@@ -34,7 +34,7 @@ static uint8_t add(uint8_t a, uint8_t b) {
 }
 
 void MatrixRenderer::render(const player_frame_t *players, size_t count,
-                            rgb_pixel_t ambient) {
+                            rgb_pixel_t ambient, const vitamin_frame_t *vitamin) {
     rgb_pixel_t heads[PIXEL_COUNT] = {};
     bool occupied[PIXEL_COUNT] = {};
     for (size_t i = 0; players != nullptr && i < count; ++i) {
@@ -58,5 +58,11 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
             pixel = {fade(pixel.r, ambient.r), fade(pixel.g, ambient.g),
                      fade(pixel.b, ambient.b)};
         }
+        output_buffer[i] = frame_buffer[i];
+    }
+    // Overlay only: vitamins disappear without leaving a worm-like trail.
+    if (vitamin && vitamin->active && vitamin->x < MATRIX_WIDTH && vitamin->y < MATRIX_HEIGHT) {
+        const auto index = matrixPixelIndex(vitamin->x, vitamin->y);
+        if (!occupied[index]) output_buffer[index] = {180, 180, 180};
     }
 }

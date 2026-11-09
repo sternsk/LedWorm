@@ -1,11 +1,76 @@
 #include "player_manager.h"
 #include <cmath>
+#include <limits>
+#include <random>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
 static player_t players[MAX_PLAYERS];
 static SemaphoreHandle_t playerMutex = nullptr;
 static uint32_t nextPlayerId = 1;
+static vitamin_frame_t vitamin;
+static uint64_t vitamin_since = 0;
+static bool vitamin_clock_started = false;
+static bool waiting_for_first_vitamin = true;
+static std::minstd_rand vitamin_random{1};
+constexpr uint64_t FIRST_VITAMIN_DELAY = 5000000;
+constexpr uint64_t VITAMIN_DELAY = 3000000;
+constexpr uint64_t VITAMIN_LIFETIME = 8000000;
+
+static bool headAt(const player_t &player, uint8_t x, uint8_t y) {
+    return int(player.worm.x_position + 0.5f) % MATRIX_WIDTH == x &&
+           int(player.worm.y_position + 0.5f) % MATRIX_HEIGHT == y;
+}
+
+// Called only under playerMutex, once all players have moved.
+static void updateVitamin(uint64_t now) {
+    bool any = false;
+    for (const auto &player : players) any |= player.active;
+    if (!any) {
+        vitamin.active = false;
+        vitamin_clock_started = false;
+        return;
+    }
+    if (!vitamin_clock_started || now < vitamin_since) {
+        vitamin.active = false;
+        vitamin_since = now;
+        vitamin_clock_started = true;
+        waiting_for_first_vitamin = true;
+        vitamin_random.seed(uint32_t(now) ^ nextPlayerId);
+    }
+    const uint64_t elapsed = now - vitamin_since;
+    if (vitamin.active) {
+        if (elapsed >= VITAMIN_LIFETIME) {
+            vitamin.active = false;
+            vitamin_since = now;
+            return;
+        }
+        for (auto &player : players) {
+            if (player.active && headAt(player, vitamin.x, vitamin.y)) {
+                if (player.score < std::numeric_limits<uint32_t>::max()) ++player.score;
+                vitamin.active = false;
+                vitamin_since = now;
+                break; // Exactly one player receives this vitamin.
+            }
+        }
+        return;
+    }
+    if (elapsed < (waiting_for_first_vitamin ? FIRST_VITAMIN_DELAY : VITAMIN_DELAY)) return;
+    const unsigned start = vitamin_random() % PIXEL_COUNT;
+    for (unsigned offset = 0; offset < PIXEL_COUNT; ++offset) {
+        const unsigned cell = (start + offset) % PIXEL_COUNT;
+        const uint8_t x = cell % MATRIX_WIDTH, y = cell / MATRIX_WIDTH;
+        bool occupied = false;
+        for (const auto &player : players) {
+            if (player.active && headAt(player, x, y)) { occupied = true; break; }
+        }
+        if (occupied) continue;
+        vitamin = {true, x, y};
+        vitamin_since = now;
+        waiting_for_first_vitamin = false;
+        break;
+    }
+}
 
 // Vor dem Start von Webserver und Render-Task aufrufen.
 bool player_manager_init() {
@@ -40,6 +105,7 @@ bool addPlayer(int socketFd) {
             player.worm.y_position = float(4 + (i / 4) * 8);
             player.socketFd = socketFd;
             player.player_id = id;
+            player.score = 0;
             player.active = true;
             xSemaphoreGive(playerMutex);
             return true;
@@ -80,7 +146,8 @@ bool updateJoystick(int socketFd, float x, float y) {
     return false;
 }
 
-size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity) {
+size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
+                          vitamin_frame_t *vitamin_snapshot) {
     if (frames == nullptr || playerMutex == nullptr ||
         xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return 0;
     size_t count = 0;
@@ -94,6 +161,8 @@ size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity)
                 player.worm.brightness};
         }
     }
+    updateVitamin(now);
+    if (vitamin_snapshot) *vitamin_snapshot = vitamin;
     xSemaphoreGive(playerMutex);
     return count;
 }
@@ -125,7 +194,7 @@ bool getPlayerState(int socketFd, player_state_t &state) {
         if (player.socketFd == socketFd) own = &player;
     }
     if (own) state = {own->player_id, own->worm.x_position, own->worm.y_position,
-                     own->worm.length, own->worm.brightness, count};
+                     own->worm.length, own->worm.brightness, count, own->score};
     xSemaphoreGive(playerMutex);
     return own != nullptr;
 }

@@ -138,7 +138,7 @@
 
         <div class="status-box" aria-label="Dein Wurm">
             <div class="status-row"><span>Verbindung:</span><span id="connection-state" class="status-val" role="status">Verbinde …</span></div>
-            <div class="status-row"><span>Position X / Y:</span><output id="worm-position" class="status-val">–</output></div>
+            <div class="status-row"><span>Punkte:</span><output id="worm-score" class="status-val">–</output></div>
             <div class="status-row"><span>Länge (konfiguriert):</span><output id="worm-length" class="status-val">–</output></div>
             <div class="status-row"><span>Helligkeit (0–255):</span><output id="worm-brightness" class="status-val">–</output></div>
         </div>
@@ -225,7 +225,7 @@
         const myIdRow = document.getElementById('my-id-row');
         const myIdVal = document.getElementById('my-id-val');
         const connectionState = document.getElementById('connection-state');
-        const wormPosition = document.getElementById('worm-position');
+        const wormScore = document.getElementById('worm-score');
         const wormLength = document.getElementById('worm-length');
         const wormBrightness = document.getElementById('worm-brightness');
         const brightnessPreview = document.getElementById('brightness-preview');
@@ -263,7 +263,7 @@
                 playerCount.textContent = data.count;
                 myIdRow.style.display = 'flex';
                 myIdVal.textContent = data.id;
-                wormPosition.textContent = `${data.x.toFixed(2)} / ${data.y.toFixed(2)}`;
+                wormScore.textContent = data.score;
                 wormLength.textContent = data.length;
                 wormBrightness.textContent = `${data.brightness} (${Math.round(data.brightness / 255 * 100)} %)`;
                 valueSlider.disabled = false;
@@ -283,7 +283,7 @@
                 connectionState.textContent = 'Getrennt – verbinde erneut …';
                 myIdRow.style.display = 'none';
                 playerCount.textContent = '–';
-                wormPosition.textContent = wormLength.textContent = wormBrightness.textContent = '–';
+                wormScore.textContent = wormLength.textContent = wormBrightness.textContent = '–';
                 brightnessPreview.textContent = '–';
                 valueSlider.disabled = true;
                 if (wifiResetComplete) {

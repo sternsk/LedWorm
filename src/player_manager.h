@@ -11,6 +11,7 @@ struct player_t {
     char player_name[32] = {};
     bool active = false;
     LedWorm worm;
+    uint32_t score = 0;
 };
 
 // Kopien statt Referenzen: Der Renderer hält während der LED-Ausgabe keinen Lock.
@@ -26,7 +27,15 @@ bool player_manager_init();
 bool addPlayer(int client_fd);
 void removePlayer(int client_fd);
 bool updateJoystick(int client_fd, float x, float y);
-size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity);
+struct vitamin_frame_t {
+    bool active = false;
+    uint8_t x = 0;
+    uint8_t y = 0;
+};
+
+// Vitamin and player snapshots are captured under the same lock.
+size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
+                          vitamin_frame_t *vitamin = nullptr);
 
 struct player_state_t {
     uint32_t player_id;
@@ -35,6 +44,7 @@ struct player_state_t {
     uint8_t length;
     uint8_t brightness;
     size_t active_players;
+    uint32_t score;
 };
 
 bool updateBrightness(int client_fd, double value);

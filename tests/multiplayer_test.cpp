@@ -203,8 +203,81 @@ static void rendering() {
     for (int i = 0; i < MAX_PLAYERS; ++i) removePlayer(10 + i);
 }
 
+static void vitamins() {
+    player_frame_t frames[MAX_PLAYERS];
+    vitamin_frame_t vitamin;
+    uint64_t now = 0;
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(!vitamin.active); // No vitamins without players.
+    assert(addPlayer(201) && addPlayer(202));
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(!vitamin.active);
+    now = 4999999;
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(!vitamin.active);
+    now = 5000000;
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(vitamin.active && vitamin.x < MATRIX_WIDTH && vitamin.y < MATRIX_HEIGHT);
+    for (const auto &p : {frames[0], frames[1]}) {
+        assert(int(p.x + 0.5f) != vitamin.x || int(p.y + 0.5f) != vitamin.y);
+    }
+    now += 8000000;
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(!vitamin.active); // Expiration awards no points.
+    player_state_t own, other;
+    assert(getPlayerState(201, own) && own.score == 0);
+    now += 2999999;
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(!vitamin.active);
+    ++now;
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(vitamin.active);
+    const auto target = vitamin;
+    for (int step = 0; step < 100 && vitamin.active; ++step) {
+        assert(getPlayerState(201, own));
+        auto direction = [](float target, float current, float extent) {
+            float delta = target - current;
+            if (delta > extent / 2) delta -= extent;
+            if (delta < -extent / 2) delta += extent;
+            return std::fmax(-1.0f, std::fmin(1.0f, delta / 0.4f));
+        };
+        assert(updateJoystick(201, direction(target.x, own.x, MATRIX_WIDTH),
+                                  direction(target.y, own.y, MATRIX_HEIGHT)));
+        now += 20000;
+        updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    }
+    assert(!vitamin.active);
+    assert(getPlayerState(201, own) && own.score == 1);
+    assert(getPlayerState(202, other) && other.score == 0);
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(getPlayerState(201, own) && own.score == 1);
+    assert(!vitamin.active);
+    removePlayer(201);
+    assert(addPlayer(203));
+    assert(getPlayerState(203, own) && own.score == 0);
+    removePlayer(203);
+    removePlayer(202);
+    now += 10000000;
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(!vitamin.active);
+
+    MatrixRenderer renderer;
+    vitamin_frame_t visible = {true, 3, 7};
+    const auto index = matrixPixelIndex(3, 7);
+    renderer.render(nullptr, 0, {0, 0, 0}, &visible);
+    assert(renderer.pixels()[index].r == 180 && renderer.pixels()[index].g == 180);
+    visible.active = false;
+    renderer.render(nullptr, 0, {0, 0, 0}, &visible);
+    assert(renderer.pixels()[index].r == 0); // No vitamin trail.
+    visible.active = true;
+    player_frame_t head = {1, 3, 7, 0, 63};
+    renderer.render(&head, 1, {0, 0, 0}, &visible);
+    assert(renderer.pixels()[index].r == 63 && renderer.pixels()[index].g == 0);
+}
+
 int main() {
     movement(); puts("PASS: unabhängige Bewegung und Matrixgrenzen");
     players(); puts("PASS: 8 Spieler, Eingaben, Reconnect und parallele Zugriffe");
     rendering(); puts("PASS: Matrixmapping, mehrere Köpfe, Mischung und Fade");
+    vitamins(); puts("PASS: vitamin timing, free spawn, pickup, per-player score, reconnect, overlay");
 }
