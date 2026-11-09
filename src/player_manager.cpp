@@ -17,6 +17,8 @@ static std::minstd_rand vitamin_random{1};
 constexpr uint64_t FIRST_VITAMIN_DELAY = 5000000;
 constexpr uint64_t VITAMIN_DELAY = 3000000;
 constexpr uint64_t AUTOPILOT_DELAY = 3000000;
+constexpr float AUTO_ACCELERATION = 8.0f; // LED cells / second squared.
+constexpr float AUTO_DECELERATION = 6.0f;
 
 static float targetDelta(float target, float current, float extent) {
     float delta = target - current;
@@ -29,6 +31,7 @@ static void movePlayer(player_t &player, uint64_t now) {
     const bool reset_clock = !player.input_clock_started || now < player.last_frame;
     const float dt = reset_clock ? 0.0f :
         std::fmin(float(now - player.last_frame) / 1000000.0f, 0.1f);
+    if (reset_clock) player.velocity_x = player.velocity_y = 0;
     if (reset_clock || player.input_pending) {
         player.last_input = now;
         player.input_clock_started = true;
@@ -36,16 +39,34 @@ static void movePlayer(player_t &player, uint64_t now) {
     }
     float x = player.worm.joystick_x, y = player.worm.joystick_y;
     if (now - player.last_input >= AUTOPILOT_DELAY) {
-        x = y = 0;
+        float wanted_x = 0, wanted_y = 0;
         if (vitamin.active && now >= vitamin_since && now - vitamin_since < VITAMIN_LIFETIME_US) {
             const float dx = targetDelta(vitamin.x, player.worm.x_position, MATRIX_WIDTH);
             const float dy = targetDelta(vitamin.y, player.worm.y_position, MATRIX_HEIGHT);
             const float distance = std::hypot(dx, dy);
-            const float travel = player.worm.nominal_speed * dt;
-            // Slow down near the target rather than overshooting or oscillating.
-            const float divisor = std::fmax(distance, travel);
-            if (divisor > 0) { x = dx / divisor; y = dy / divisor; }
+            // Begin braking before reaching the vitamin, then gently coast to rest.
+            const float wanted_speed = std::fmin(float(player.worm.nominal_speed),
+                std::sqrt(2 * AUTO_DECELERATION * std::fmax(0.0f, distance - 0.25f)));
+            if (distance > 0) {
+                wanted_x = dx / distance * wanted_speed;
+                wanted_y = dy / distance * wanted_speed;
+            }
         }
+        const float change_x = wanted_x - player.velocity_x;
+        const float change_y = wanted_y - player.velocity_y;
+        const float change = std::hypot(change_x, change_y);
+        const float rate = std::hypot(wanted_x, wanted_y) < std::hypot(player.velocity_x, player.velocity_y)
+            ? AUTO_DECELERATION : AUTO_ACCELERATION;
+        const float fraction = change > 0 ? std::fmin(1.0f, rate * dt / change) : 0;
+        player.velocity_x += change_x * fraction;
+        player.velocity_y += change_y * fraction;
+        const float speed = player.worm.nominal_speed;
+        x = speed > 0 ? player.velocity_x / speed : 0;
+        y = speed > 0 ? player.velocity_y / speed : 0;
+    } else {
+        // Manual input retains immediate control; remember its velocity for takeover.
+        player.velocity_x = x * player.worm.nominal_speed;
+        player.velocity_y = y * player.worm.nominal_speed;
     }
     player.worm.move(x, y, now);
     player.last_frame = now;
@@ -149,6 +170,7 @@ bool addPlayer(int socketFd) {
             player.score = 0;
             player.last_input = player.last_frame = 0;
             player.input_pending = player.input_clock_started = false;
+            player.velocity_x = player.velocity_y = 0;
             player.active = true;
             xSemaphoreGive(playerMutex);
             return true;

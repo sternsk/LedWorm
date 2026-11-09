@@ -16,6 +16,8 @@ struct player_t {
     uint64_t last_frame = 0;
     bool input_pending = false;
     bool input_clock_started = false;
+    float velocity_x = 0;
+    float velocity_y = 0;
 };
 
 // Kopien statt Referenzen: Der Renderer hält während der LED-Ausgabe keinen Lock.
