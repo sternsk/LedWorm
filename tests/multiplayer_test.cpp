@@ -446,8 +446,8 @@ static void autopilot() {
         if (d < -extent / 2) d += extent;
         return d;
     };
-    const float dx = delta(vitamin.x, start_x, MATRIX_WIDTH);
-    const float dy = delta(vitamin.y, start_y, MATRIX_HEIGHT);
+    const float dx = float(vitamin.x) - start_x;
+    const float dy = float(vitamin.y) - start_y;
     const float distance = std::hypot(dx, dy);
     assert(updateJoystick(402, 0, 0));
     updatePlayerFrames(7980000, frames, MAX_PLAYERS, &vitamin);
@@ -480,6 +480,8 @@ static void autopilot() {
         now += 20000;
         assert(updateJoystick(402, 0, 0));
         updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+        assert(frames[0].x >= 0 && frames[0].x <= MATRIX_WIDTH - 1);
+        assert(frames[0].y >= 0 && frames[0].y <= MATRIX_HEIGHT - 1);
         assert(getPlayerState(401, state));
     }
     assert(!vitamin.active);
@@ -528,6 +530,27 @@ static void autopilot() {
     removePlayer(403);
 }
 
+static void boundedMovement() {
+    LedWorm worm;
+    worm.init(1); worm.nominal_speed = 50;
+    worm.x_position = MATRIX_WIDTH - 0.25f;
+    worm.y_position = MATRIX_HEIGHT - 0.25f;
+    worm.move(1, 1, 0, false);
+    worm.move(1, 1, 100000, false);
+    assert(worm.x_position == MATRIX_WIDTH - 1 && worm.y_position == MATRIX_HEIGHT - 1);
+    for (unsigned age = 0; age < worm.bodyCount(); ++age) {
+        assert(worm.bodyCell(age) % MATRIX_WIDTH == MATRIX_WIDTH - 1);
+        assert(worm.bodyCell(age) / MATRIX_WIDTH == MATRIX_HEIGHT - 1);
+    }
+    worm.x_position = worm.y_position = 0.25f;
+    worm.move(-1, -1, 200000, false);
+    assert(worm.x_position == 0 && worm.y_position == 0);
+    worm.move(-1, -1, 300000, false);
+    assert(worm.x_position == 0 && worm.y_position == 0);
+    worm.move(-1, -1, 320000); // Manual movement still wraps.
+    assert(worm.x_position == MATRIX_WIDTH - 1 && worm.y_position == MATRIX_HEIGHT - 1);
+}
+
 int main() {
     movement(); puts("PASS: unabhängige Bewegung und Matrixgrenzen");
     players(); puts("PASS: 8 Spieler, Eingaben, Reconnect und parallele Zugriffe");
@@ -535,5 +558,6 @@ int main() {
     vitamins(); puts("PASS: vitamin timing, free spawn, pickup, per-player score, reconnect, overlay");
     bodies(); puts("PASS: growing bodies, stationary head, wraparound, ring storage and rendering");
     selfCuts(); puts("PASS: self-cut, retained tail, enclosed area value 5, edge crossing and reset");
-    autopilot(); puts("PASS: three-second autopilot, torus direction, manual takeover, pickup, independent timers");
+    autopilot(); puts("PASS: three-second autopilot, direct direction, manual takeover, pickup, independent timers");
+    boundedMovement(); puts("PASS: automatic edge bounds and manual wraparound");
 }

@@ -20,13 +20,6 @@ constexpr uint64_t AUTOPILOT_DELAY = 3000000;
 constexpr float AUTO_ACCELERATION = 8.0f; // LED cells / second squared.
 constexpr float AUTO_DECELERATION = 6.0f;
 
-static float targetDelta(float target, float current, float extent) {
-    float delta = target - current;
-    if (delta > extent / 2) delta -= extent;
-    if (delta < -extent / 2) delta += extent;
-    return delta;
-}
-
 static void movePlayer(player_t &player, uint64_t now) {
     const bool reset_clock = !player.input_clock_started || now < player.last_frame;
     const float dt = reset_clock ? 0.0f :
@@ -38,11 +31,12 @@ static void movePlayer(player_t &player, uint64_t now) {
         player.input_pending = false;
     }
     float x = player.worm.joystick_x, y = player.worm.joystick_y;
-    if (now - player.last_input >= AUTOPILOT_DELAY) {
+    const bool automatic = now - player.last_input >= AUTOPILOT_DELAY;
+    if (automatic) {
         float wanted_x = 0, wanted_y = 0;
         if (vitamin.active && now >= vitamin_since && now - vitamin_since < VITAMIN_LIFETIME_US) {
-            const float dx = targetDelta(vitamin.x, player.worm.x_position, MATRIX_WIDTH);
-            const float dy = targetDelta(vitamin.y, player.worm.y_position, MATRIX_HEIGHT);
+            const float dx = float(vitamin.x) - player.worm.x_position;
+            const float dy = float(vitamin.y) - player.worm.y_position;
             const float distance = std::hypot(dx, dy);
             // Begin braking before reaching the vitamin, then gently coast to rest.
             const float wanted_speed = std::fmin(float(player.worm.nominal_speed),
@@ -68,7 +62,14 @@ static void movePlayer(player_t &player, uint64_t now) {
         player.velocity_x = x * player.worm.nominal_speed;
         player.velocity_y = y * player.worm.nominal_speed;
     }
-    player.worm.move(x, y, now);
+    player.worm.move(x, y, now, !automatic);
+    if (automatic) {
+        // Discard outward momentum at the edge, including while coasting.
+        if ((player.worm.x_position <= 0 && player.velocity_x < 0) ||
+            (player.worm.x_position >= MATRIX_WIDTH - 1 && player.velocity_x > 0)) player.velocity_x = 0;
+        if ((player.worm.y_position <= 0 && player.velocity_y < 0) ||
+            (player.worm.y_position >= MATRIX_HEIGHT - 1 && player.velocity_y > 0)) player.velocity_y = 0;
+    }
     player.last_frame = now;
 }
 

@@ -95,11 +95,15 @@ bool LedWorm::init(uint32_t playerId) {
     return active;
 }
 
-bool LedWorm::move(float x, float y, uint64_t now) {
+bool LedWorm::move(float x, float y, uint64_t now, bool wrap) {
     if (!active || !std::isfinite(x) || !std::isfinite(y)) {
         return false;
     }
     memset(cut, 0, sizeof(cut));
+    if (!wrap) {
+        x_position = std::clamp(x_position, 0.0f, float(MATRIX_WIDTH - 1));
+        y_position = std::clamp(y_position, 0.0f, float(MATRIX_HEIGHT - 1));
+    }
     rememberPosition(x_position, y_position);
     if (!clock_started || now < last_move_time) {
         last_move_time = now;
@@ -109,7 +113,10 @@ bool LedWorm::move(float x, float y, uint64_t now) {
     // esp_timer_get_time() liefert Mikrosekunden. Keine Sprünge nach Pausen.
     const float dt = std::min((now - last_move_time) / 1000000.0f, 0.1f);
     last_move_time = now;
-    const float dx = nominal_speed * x * dt, dy = nominal_speed * y * dt;
+    const float next_x = x_position + nominal_speed * x * dt;
+    const float next_y = y_position + nominal_speed * y * dt;
+    const float dx = (wrap ? next_x : std::clamp(next_x, 0.0f, float(MATRIX_WIDTH - 1))) - x_position;
+    const float dy = (wrap ? next_y : std::clamp(next_y, 0.0f, float(MATRIX_HEIGHT - 1))) - y_position;
     // Sample at most half a cell apart so longer frames retain intermediate cells.
     const unsigned steps = unsigned(std::ceil(std::max(std::abs(dx), std::abs(dy)) * 2));
     for (unsigned i = 1; i <= steps; ++i) {

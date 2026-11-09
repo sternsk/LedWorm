@@ -16,7 +16,7 @@ public:
     bool active = false;
 
     bool init(uint32_t playerId);
-    bool move(float x, float y, uint64_t now);
+    bool move(float x, float y, uint64_t now, bool wrap = true);
     void setJoystick(float x, float y);
     void deactivate();
     uint8_t bodyCount() const { return path_count < length ? path_count : length; }
