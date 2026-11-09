@@ -43,7 +43,9 @@ assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))), {type:'value'
 assert.equal(a.nodes['brightness-preview'].textContent, 0);
 // Confirmed brightness only changes when the server acknowledges it.
 assert.equal(a.nodes['worm-brightness'].textContent, '63 (25 %)');
-a.receive({id:1,score:1,length:8,brightness:0,count:2});
+a.receive({id:1,score:1,length:9,brightness:0,count:2});
+assert.equal(a.nodes['worm-length'].textContent, 9);
+assert.equal(b.nodes['worm-length'].textContent, 8);
 assert.equal(a.nodes['worm-score'].textContent, 1);
 assert.equal(b.nodes['worm-score'].textContent, 7);
 assert.equal(a.nodes['worm-brightness'].textContent, '0 (0 %)');

@@ -48,6 +48,7 @@ static void updateVitamin(uint64_t now) {
         for (auto &player : players) {
             if (player.active && headAt(player, vitamin.x, vitamin.y)) {
                 if (player.score < std::numeric_limits<uint32_t>::max()) ++player.score;
+                if (player.worm.length < LedWorm::MAX_LENGTH) ++player.worm.length;
                 vitamin.active = false;
                 vitamin_since = now;
                 break; // Exactly one player receives this vitamin.
@@ -62,7 +63,12 @@ static void updateVitamin(uint64_t now) {
         const uint8_t x = cell % MATRIX_WIDTH, y = cell / MATRIX_WIDTH;
         bool occupied = false;
         for (const auto &player : players) {
-            if (player.active && headAt(player, x, y)) { occupied = true; break; }
+            if (!player.active) continue;
+            if (headAt(player, x, y)) { occupied = true; break; }
+            for (unsigned segment = 0; segment < player.worm.bodyCount(); ++segment) {
+                if (player.worm.bodyCell(segment) == cell) { occupied = true; break; }
+            }
+            if (occupied) break;
         }
         if (occupied) continue;
         vitamin = {true, x, y};
@@ -159,6 +165,11 @@ size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
             frames[count++] = {player.player_id, player.worm.x_position,
                 player.worm.y_position, uint8_t(i * 256 / MAX_PLAYERS),
                 player.worm.brightness};
+            auto &frame = frames[count - 1];
+            frame.body_count = player.worm.bodyCount();
+            for (unsigned segment = 0; segment < frame.body_count; ++segment) {
+                frame.body[segment] = player.worm.bodyCell(segment);
+            }
         }
     }
     updateVitamin(now);

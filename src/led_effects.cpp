@@ -43,7 +43,7 @@ void led_render_task(void *) {
     TickType_t lastWake = xTaskGetTickCount();
     const TickType_t frameTicks = pdMS_TO_TICKS(20); // 50 Frames pro Sekunde
     while (true) {
-        player_frame_t players[MAX_PLAYERS];
+        static player_frame_t players[MAX_PLAYERS];
         vitamin_frame_t vitamin;
         const size_t count = updatePlayerFrames(esp_timer_get_time(), players, MAX_PLAYERS, &vitamin);
         renderer.render(players, count,

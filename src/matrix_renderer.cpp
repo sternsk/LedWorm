@@ -49,6 +49,17 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
         heads[index].r = add(heads[index].r, color.r);
         heads[index].g = add(heads[index].g, color.g);
         heads[index].b = add(heads[index].b, color.b);
+        bool drawn[PIXEL_COUNT] = {};
+        drawn[index] = true;
+        for (unsigned segment = 0; segment < player.body_count; ++segment) {
+            const unsigned cell = player.body[segment];
+            const auto body_index = matrixPixelIndex(cell % MATRIX_WIDTH, cell / MATRIX_WIDTH);
+            if (drawn[body_index]) continue;
+            drawn[body_index] = occupied[body_index] = true;
+            heads[body_index].r = add(heads[body_index].r, color.r);
+            heads[body_index].g = add(heads[body_index].g, color.g);
+            heads[body_index].b = add(heads[body_index].b, color.b);
+        }
     }
     for (size_t i = 0; i < PIXEL_COUNT; ++i) {
         if (occupied[i]) {

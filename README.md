@@ -21,19 +21,23 @@ Der Render-Task aktualisiert alle Spieler mit demselben Zeitstempel und
 ohne diesen Lock. Pro Frame werden alle Köpfe zusammengeführt und einmal an
 die Hardware gesendet. Überlappende Köpfe mischen ihre Farben; alte Positionen
 blenden zur gewählten Hintergrundfarbe aus. Beim Verbindungsende wird der
-Spielerplatz freigegeben. Die Schweife sind ein visueller Fade, keine bereits
-implementierten Spielkörper oder Kollisionen.
+Spielerplatz freigegeben. Die Wurmkörper bestehen aus den zuletzt besuchten
+LED-Zellen; dahinter bleibt ein ausblendender Schweif. Körperkollisionen sind
+noch nicht implementiert.
 
 Spieler werden beim WebSocket-Handshake automatisch angelegt. Die Oberfläche
 zeigt die zugewiesene Spieler-ID, Spielerzahl und alle 200 ms den eigenen
-Serverzustand: Punktezahl, konfigurierte Länge und Helligkeit (0–255 sowie
-Prozent). Die konfigurierte Länge beträgt aktuell 8; der sichtbare Schweif ist
-weiterhin ein Fade und kein Segmentkörper dieser Länge.
+Serverzustand: Punktezahl, Länge und Helligkeit (0–255 sowie Prozent).
+Die Startlänge beträgt 8. Pro eingesammeltem Vitamin wächst der Wurm um ein
+Segment, bis maximal 255. Der Körper baut sich beim Bewegen auf und folgt
+auch über Matrixränder dem zurückgelegten Weg. Stillstand fügt keine Segmente
+hinzu. Überlappende eigene Segmente belegen dieselbe LED ohne zusätzliche
+Helligkeit; dadurch können weniger LEDs als gespeicherte Segmente sichtbar sein.
 
 Der `value-slider` steuert ausschließlich die Helligkeit des eigenen Wurms;
 die Zuordnung erfolgt serverseitig über den WebSocket, nicht über eine vom
 Browser angegebene Spieler-ID. Standard ist 63 (die bisherige Helligkeit),
-0 schaltet den Kopf aus, 255 liefert die volle Kanalhelligkeit. Bereits gezeichnete
+0 schaltet Kopf und Körper aus, 255 liefert die volle Kanalhelligkeit. Bereits gezeichnete
 Schweife blenden weiterhin aus. Die Hintergrundfarbe bleibt separat steuerbar.
 Bei Verbindungsverlust werden veraltete Messwerte ausgeblendet und der Slider
 bis zur erneuten Anmeldung deaktiviert.
@@ -48,9 +52,10 @@ Ein Helligkeitskommando erhält ebenfalls den bestätigten Serverzustand zurück
 ## Vitamine und Punkte
 
 Solange Spieler verbunden sind, erscheint nach fünf Sekunden ein weißes Vitamin
-auf einer zufälligen LED, die von keinem Kopf belegt ist. Es bleibt bis zu acht
+auf einer zufälligen LED, die von keinem Kopf oder Körper belegt ist. Es bleibt bis zu acht
 Sekunden sichtbar. Erreicht ein Wurmkopf diese LED, verschwindet das Vitamin und
-der Spieler erhält einen Punkt. Treffen mehrere Köpfe im selben Frame ein,
+der Spieler erhält einen Punkt und ein zusätzliches Körpersegment (bis Länge 255).
+Treffen mehrere Köpfe im selben Frame ein,
 bekommt der erste aktive Spieler in der internen Slot-Reihenfolge den Punkt.
 Nach Einsammeln oder Ablauf erscheint nach drei Sekunden das nächste Vitamin.
 Es ist immer höchstens eines aktiv; Vitamine hinterlassen keinen Schweif.

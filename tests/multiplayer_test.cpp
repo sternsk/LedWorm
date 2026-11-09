@@ -247,14 +247,14 @@ static void vitamins() {
         updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
     }
     assert(!vitamin.active);
-    assert(getPlayerState(201, own) && own.score == 1);
-    assert(getPlayerState(202, other) && other.score == 0);
+    assert(getPlayerState(201, own) && own.score == 1 && own.length == 9);
+    assert(getPlayerState(202, other) && other.score == 0 && other.length == 8);
     updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
     assert(getPlayerState(201, own) && own.score == 1);
     assert(!vitamin.active);
     removePlayer(201);
     assert(addPlayer(203));
-    assert(getPlayerState(203, own) && own.score == 0);
+    assert(getPlayerState(203, own) && own.score == 0 && own.length == 8);
     removePlayer(203);
     removePlayer(202);
     now += 10000000;
@@ -275,9 +275,50 @@ static void vitamins() {
     assert(renderer.pixels()[index].r == 63 && renderer.pixels()[index].g == 0);
 }
 
+static void bodies() {
+    LedWorm worm;
+    assert(worm.init(1));
+    worm.nominal_speed = 50;
+    worm.length = 3;
+    worm.x_position = 14;
+    worm.y_position = 4;
+    worm.move(1, 0, 0);
+    worm.move(1, 0, 100000); // 14 -> 15 -> 0 -> 1 -> 2 -> 3.
+    assert(worm.bodyCount() == 3);
+    assert(worm.bodyCell(0) == 4 * MATRIX_WIDTH + 3);
+    assert(worm.bodyCell(1) == 4 * MATRIX_WIDTH + 2);
+    assert(worm.bodyCell(2) == 4 * MATRIX_WIDTH + 1);
+    worm.length = 5;
+    worm.move(1, 0, 140000);
+    assert(worm.bodyCount() == 5);
+    worm.move(0, 0, 160000);
+    assert(worm.bodyCount() == 5); // Stationary heads do not add segments.
+    player_frame_t frame = {1, worm.x_position, worm.y_position, 0, 63};
+    frame.body_count = worm.bodyCount();
+    for (unsigned i = 0; i < frame.body_count; ++i) frame.body[i] = worm.bodyCell(i);
+    MatrixRenderer renderer;
+    renderer.render(&frame, 1, {0, 0, 0});
+    unsigned visible = 0;
+    for (unsigned i = 0; i < PIXEL_COUNT; ++i) {
+        if (renderer.pixels()[i].r) { ++visible; assert(renderer.pixels()[i].r == 63); }
+    }
+    assert(visible == 5);
+    // Long histories wrap their storage without corrupting segment order.
+    worm.length = LedWorm::MAX_LENGTH;
+    for (unsigned i = 1; i <= 300; ++i) worm.move(1, 0, 160000 + i * 20000);
+    assert(worm.bodyCount() == LedWorm::MAX_LENGTH);
+    for (unsigned i = 1; i < worm.bodyCount(); ++i) {
+        assert(worm.bodyCell(i) / MATRIX_WIDTH == 4);
+        assert((worm.bodyCell(i - 1) % MATRIX_WIDTH + MATRIX_WIDTH - 1) % MATRIX_WIDTH ==
+               worm.bodyCell(i) % MATRIX_WIDTH);
+    }
+    assert(worm.init(2) && worm.length == 8 && worm.bodyCount() == 0);
+}
+
 int main() {
     movement(); puts("PASS: unabhängige Bewegung und Matrixgrenzen");
     players(); puts("PASS: 8 Spieler, Eingaben, Reconnect und parallele Zugriffe");
     rendering(); puts("PASS: Matrixmapping, mehrere Köpfe, Mischung und Fade");
     vitamins(); puts("PASS: vitamin timing, free spawn, pickup, per-player score, reconnect, overlay");
+    bodies(); puts("PASS: growing bodies, stationary head, wraparound, ring storage and rendering");
 }
