@@ -63,6 +63,16 @@ Ein Helligkeitskommando erhält ebenfalls den bestätigten Serverzustand zurück
 
 ## Vitamine und Punkte
 
+Nach drei Sekunden ohne gültige Joysticknachricht steuert der Wurm automatisch
+zum aktuellen Vitamin. Er nimmt den kürzesten Weg über die Matrixränder und
+verlangsamt nahe am Ziel, damit er es nicht überspringt. Ohne aktives Vitamin
+bleibt er stehen. Jede neue Joysticknachricht (auch die Neutralstellung) gibt
+die Steuerung sofort an den Spieler zurück und startet dessen Timer neu.
+Helligkeitsänderungen, Zustandsabfragen und ungültige Eingaben zählen nicht
+als Joystickaktivität. Die Timer gelten pro Spieler und starten bei einer
+neuen Verbindung neu. Die Automatik vermeidet keine eigenen Körpersegmente;
+die Regeln für Selbstschnitte gelten weiterhin.
+
 Solange Spieler verbunden sind, erscheint nach fünf Sekunden ein weißes Vitamin
 auf einer zufälligen LED, die von keinem Kopf oder Körper belegt ist. Es bleibt bis zu acht
 Sekunden aktiv. Es blendet über vier Sekunden sanft aus der darunterliegenden

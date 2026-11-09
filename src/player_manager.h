@@ -12,6 +12,10 @@ struct player_t {
     bool active = false;
     LedWorm worm;
     uint32_t score = 0;
+    uint64_t last_input = 0;
+    uint64_t last_frame = 0;
+    bool input_pending = false;
+    bool input_clock_started = false;
 };
 
 // Kopien statt Referenzen: Der Renderer hält während der LED-Ausgabe keinen Lock.

@@ -243,6 +243,7 @@ static void vitamins() {
         };
         assert(updateJoystick(201, direction(target.x, own.x, MATRIX_WIDTH),
                                   direction(target.y, own.y, MATRIX_HEIGHT)));
+        assert(updateJoystick(202, 0, 0)); // Keep the second player under manual control.
         now += 20000;
         updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
     }
@@ -428,6 +429,73 @@ static void selfCuts() {
     removePlayer(302);
 }
 
+static void autopilot() {
+    player_frame_t frames[MAX_PLAYERS];
+    vitamin_frame_t vitamin;
+    updatePlayerFrames(0, frames, MAX_PLAYERS, &vitamin);
+    assert(addPlayer(401) && addPlayer(402));
+    updatePlayerFrames(0, frames, MAX_PLAYERS, &vitamin);
+    updatePlayerFrames(5000000, frames, MAX_PLAYERS, &vitamin);
+    assert(vitamin.active);
+    assert(updateJoystick(401, 0, 0) && updateJoystick(402, 0, 0));
+    updatePlayerFrames(5000000, frames, MAX_PLAYERS, &vitamin);
+    const float start_x = frames[0].x, start_y = frames[0].y;
+    auto delta = [](float target, float current, float extent) {
+        float d = target - current;
+        if (d > extent / 2) d -= extent;
+        if (d < -extent / 2) d += extent;
+        return d;
+    };
+    const float dx = delta(vitamin.x, start_x, MATRIX_WIDTH);
+    const float dy = delta(vitamin.y, start_y, MATRIX_HEIGHT);
+    const float distance = std::hypot(dx, dy);
+    assert(updateJoystick(402, 0, 0));
+    updatePlayerFrames(7980000, frames, MAX_PLAYERS, &vitamin);
+    assert(frames[0].x == start_x && frames[0].y == start_y);
+    assert(!updateJoystick(401, 2, 0)); // Invalid input does not reset inactivity.
+    assert(updateBrightness(401, 25));
+    player_state_t state;
+    assert(getPlayerState(401, state));
+    assert(updateJoystick(402, 0, 0));
+    updatePlayerFrames(8000000, frames, MAX_PLAYERS, &vitamin);
+    assert(std::fabs(delta(frames[0].x, start_x, MATRIX_WIDTH) - dx / distance * 0.4f) < 0.0001f);
+    assert(std::fabs(delta(frames[0].y, start_y, MATRIX_HEIGHT) - dy / distance * 0.4f) < 0.0001f);
+    assert(frames[1].x == 6 && frames[1].y == 4); // Independent timer.
+    const float auto_x = frames[0].x, auto_y = frames[0].y;
+    assert(updateJoystick(401, 0, 0) && updateJoystick(402, 0, 0));
+    updatePlayerFrames(8020000, frames, MAX_PLAYERS, &vitamin);
+    assert(frames[0].x == auto_x && frames[0].y == auto_y); // Immediate takeover.
+    assert(updateJoystick(401, 1, 0) && updateJoystick(402, 0, 0));
+    updatePlayerFrames(8040000, frames, MAX_PLAYERS, &vitamin);
+    assert(std::fabs(delta(frames[0].x, auto_x, MATRIX_WIDTH) - 0.4f) < 0.0001f);
+    assert(frames[0].y == auto_y);
+    assert(updateJoystick(401, 0, 0) && updateJoystick(402, 0, 0));
+    updatePlayerFrames(8060000, frames, MAX_PLAYERS, &vitamin);
+    uint64_t now = 11060000;
+    assert(updateJoystick(402, 0, 0));
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    for (unsigned step = 0; step < 100 && vitamin.active; ++step) {
+        now += 20000;
+        assert(updateJoystick(402, 0, 0));
+        updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    }
+    assert(!vitamin.active);
+    assert(getPlayerState(401, state) && state.score == 1);
+    assert(getPlayerState(402, state) && state.score == 0);
+    const float stopped_x = frames[0].x, stopped_y = frames[0].y;
+    now += 20000;
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(frames[0].x == stopped_x && frames[0].y == stopped_y);
+    removePlayer(401); removePlayer(402);
+    assert(addPlayer(403));
+    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
+    assert(frames[0].x == 2 && frames[0].y == 4);
+    // Restarted simulation clocks must not underflow the inactivity timer.
+    updatePlayerFrames(0, frames, MAX_PLAYERS, &vitamin);
+    assert(frames[0].x == 2 && frames[0].y == 4);
+    removePlayer(403);
+}
+
 int main() {
     movement(); puts("PASS: unabhängige Bewegung und Matrixgrenzen");
     players(); puts("PASS: 8 Spieler, Eingaben, Reconnect und parallele Zugriffe");
@@ -435,4 +503,5 @@ int main() {
     vitamins(); puts("PASS: vitamin timing, free spawn, pickup, per-player score, reconnect, overlay");
     bodies(); puts("PASS: growing bodies, stationary head, wraparound, ring storage and rendering");
     selfCuts(); puts("PASS: self-cut, retained tail, enclosed area value 5, edge crossing and reset");
+    autopilot(); puts("PASS: three-second autopilot, torus direction, manual takeover, pickup, independent timers");
 }

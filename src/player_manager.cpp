@@ -16,6 +16,40 @@ static bool waiting_for_first_vitamin = true;
 static std::minstd_rand vitamin_random{1};
 constexpr uint64_t FIRST_VITAMIN_DELAY = 5000000;
 constexpr uint64_t VITAMIN_DELAY = 3000000;
+constexpr uint64_t AUTOPILOT_DELAY = 3000000;
+
+static float targetDelta(float target, float current, float extent) {
+    float delta = target - current;
+    if (delta > extent / 2) delta -= extent;
+    if (delta < -extent / 2) delta += extent;
+    return delta;
+}
+
+static void movePlayer(player_t &player, uint64_t now) {
+    const bool reset_clock = !player.input_clock_started || now < player.last_frame;
+    const float dt = reset_clock ? 0.0f :
+        std::fmin(float(now - player.last_frame) / 1000000.0f, 0.1f);
+    if (reset_clock || player.input_pending) {
+        player.last_input = now;
+        player.input_clock_started = true;
+        player.input_pending = false;
+    }
+    float x = player.worm.joystick_x, y = player.worm.joystick_y;
+    if (now - player.last_input >= AUTOPILOT_DELAY) {
+        x = y = 0;
+        if (vitamin.active && now >= vitamin_since && now - vitamin_since < VITAMIN_LIFETIME_US) {
+            const float dx = targetDelta(vitamin.x, player.worm.x_position, MATRIX_WIDTH);
+            const float dy = targetDelta(vitamin.y, player.worm.y_position, MATRIX_HEIGHT);
+            const float distance = std::hypot(dx, dy);
+            const float travel = player.worm.nominal_speed * dt;
+            // Slow down near the target rather than overshooting or oscillating.
+            const float divisor = std::fmax(distance, travel);
+            if (divisor > 0) { x = dx / divisor; y = dy / divisor; }
+        }
+    }
+    player.worm.move(x, y, now);
+    player.last_frame = now;
+}
 
 static bool headAt(const player_t &player, uint8_t x, uint8_t y) {
     return int(player.worm.x_position + 0.5f) % MATRIX_WIDTH == x &&
@@ -113,6 +147,8 @@ bool addPlayer(int socketFd) {
             player.socketFd = socketFd;
             player.player_id = id;
             player.score = 0;
+            player.last_input = player.last_frame = 0;
+            player.input_pending = player.input_clock_started = false;
             player.active = true;
             xSemaphoreGive(playerMutex);
             return true;
@@ -145,6 +181,7 @@ bool updateJoystick(int socketFd, float x, float y) {
     for (auto &player : players) {
         if (player.active && player.socketFd == socketFd) {
             player.worm.setJoystick(x, y);
+            player.input_pending = true;
             xSemaphoreGive(playerMutex);
             return true;
         }
@@ -161,7 +198,7 @@ size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
     for (size_t i = 0; i < MAX_PLAYERS; ++i) {
         auto &player = players[i];
         if (!player.active) continue;
-        player.worm.move(player.worm.joystick_x, player.worm.joystick_y, now);
+        movePlayer(player, now);
         if (count < capacity) {
             frames[count++] = {player.player_id, player.worm.x_position,
                 player.worm.y_position, uint8_t(i * 256 / MAX_PLAYERS),
