@@ -86,6 +86,17 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     // Overlay only: vitamins disappear without leaving a worm-like trail.
     if (vitamin && vitamin->active && vitamin->x < MATRIX_WIDTH && vitamin->y < MATRIX_HEIGHT) {
         const auto index = matrixPixelIndex(vitamin->x, vitamin->y);
-        if (!occupied[index]) output_buffer[index] = {180, 180, 180};
+        if (!occupied[index]) {
+            const uint64_t age = std::min(vitamin->age_us, VITAMIN_LIFETIME_US);
+            const float phase = float(std::min(age, VITAMIN_LIFETIME_US - age)) /
+                                float(VITAMIN_LIFETIME_US / 2);
+            const float amount = phase * phase * (3.0f - 2.0f * phase);
+            // Blend with the actual pixel, including claimed areas and fading trails.
+            const auto blend = [amount](uint8_t channel) {
+                return uint8_t(std::lround(channel + (48.0f - channel) * amount));
+            };
+            auto &pixel = output_buffer[index];
+            pixel = {blend(pixel.r), blend(pixel.g), blend(pixel.b)};
+        }
     }
 }

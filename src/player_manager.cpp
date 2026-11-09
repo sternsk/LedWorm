@@ -16,7 +16,6 @@ static bool waiting_for_first_vitamin = true;
 static std::minstd_rand vitamin_random{1};
 constexpr uint64_t FIRST_VITAMIN_DELAY = 5000000;
 constexpr uint64_t VITAMIN_DELAY = 3000000;
-constexpr uint64_t VITAMIN_LIFETIME = 8000000;
 
 static bool headAt(const player_t &player, uint8_t x, uint8_t y) {
     return int(player.worm.x_position + 0.5f) % MATRIX_WIDTH == x &&
@@ -41,11 +40,12 @@ static void updateVitamin(uint64_t now) {
     }
     const uint64_t elapsed = now - vitamin_since;
     if (vitamin.active) {
-        if (elapsed >= VITAMIN_LIFETIME) {
+        if (elapsed >= VITAMIN_LIFETIME_US) {
             vitamin.active = false;
             vitamin_since = now;
             return;
         }
+        vitamin.age_us = elapsed;
         for (auto &player : players) {
             if (player.active && headAt(player, vitamin.x, vitamin.y)) {
                 if (player.score < std::numeric_limits<uint32_t>::max()) ++player.score;

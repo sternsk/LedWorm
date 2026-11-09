@@ -262,10 +262,10 @@ static void vitamins() {
     assert(!vitamin.active);
 
     MatrixRenderer renderer;
-    vitamin_frame_t visible = {true, 3, 7};
+    vitamin_frame_t visible = {true, 3, 7, VITAMIN_LIFETIME_US / 2};
     const auto index = matrixPixelIndex(3, 7);
     renderer.render(nullptr, 0, {0, 0, 0}, &visible);
-    assert(renderer.pixels()[index].r == 180 && renderer.pixels()[index].g == 180);
+    assert(renderer.pixels()[index].r == 48 && renderer.pixels()[index].g == 48);
     visible.active = false;
     renderer.render(nullptr, 0, {0, 0, 0}, &visible);
     assert(renderer.pixels()[index].r == 0); // No vitamin trail.
@@ -273,6 +273,22 @@ static void vitamins() {
     player_frame_t head = {1, 3, 7, 0, 63};
     renderer.render(&head, 1, {0, 0, 0}, &visible);
     assert(renderer.pixels()[index].r == 63 && renderer.pixels()[index].g == 0);
+    // Fade starts and ends at the underlying colored background, symmetrically.
+    MatrixRenderer soft;
+    for (unsigned i = 0; i < 100; ++i) soft.render(nullptr, 0, {8, 16, 24});
+    visible.age_us = 0;
+    soft.render(nullptr, 0, {8, 16, 24}, &visible);
+    assert(soft.pixels()[index].r == 8 && soft.pixels()[index].b == 24);
+    visible.age_us = VITAMIN_LIFETIME_US / 4;
+    soft.render(nullptr, 0, {8, 16, 24}, &visible);
+    const auto rising = soft.pixels()[index];
+    assert(rising.r == 28 && rising.g == 32 && rising.b == 36);
+    visible.age_us = VITAMIN_LIFETIME_US * 3 / 4;
+    soft.render(nullptr, 0, {8, 16, 24}, &visible);
+    assert(soft.pixels()[index].r == rising.r);
+    visible.age_us = VITAMIN_LIFETIME_US;
+    soft.render(nullptr, 0, {8, 16, 24}, &visible);
+    assert(soft.pixels()[index].r == 8 && soft.pixels()[index].b == 24);
 }
 
 static void bodies() {

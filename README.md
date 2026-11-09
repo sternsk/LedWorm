@@ -65,7 +65,10 @@ Ein Helligkeitskommando erhält ebenfalls den bestätigten Serverzustand zurück
 
 Solange Spieler verbunden sind, erscheint nach fünf Sekunden ein weißes Vitamin
 auf einer zufälligen LED, die von keinem Kopf oder Körper belegt ist. Es bleibt bis zu acht
-Sekunden sichtbar. Erreicht ein Wurmkopf diese LED, verschwindet das Vitamin und
+Sekunden aktiv. Es blendet über vier Sekunden sanft aus der darunterliegenden
+Farbe zu dezentem Weiß (Value 48 statt zuvor 180) und über vier Sekunden wieder
+zurück. Die Übergänge laufen zeitbasiert mit weichem Start und Ende.
+Erreicht ein Wurmkopf diese LED, verschwindet das Vitamin und
 der Spieler erhält einen Punkt und ein zusätzliches Körpersegment (bis Länge 255).
 Treffen mehrere Köpfe im selben Frame ein,
 bekommt der erste aktive Spieler in der internen Slot-Reihenfolge den Punkt.

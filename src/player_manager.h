@@ -32,10 +32,12 @@ bool player_manager_init();
 bool addPlayer(int client_fd);
 void removePlayer(int client_fd);
 bool updateJoystick(int client_fd, float x, float y);
+constexpr uint64_t VITAMIN_LIFETIME_US = 8000000;
 struct vitamin_frame_t {
     bool active = false;
     uint8_t x = 0;
     uint8_t y = 0;
+    uint64_t age_us = 0;
 };
 
 // Vitamin and player snapshots are captured under the same lock.
