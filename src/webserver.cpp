@@ -14,8 +14,8 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 std::atomic<float> joystick_x{0.0f};
 std::atomic<float> joystick_y{0.0f};
 
-volatile uint8_t ambient_r = 0;
-volatile uint8_t ambient_g = 0;
+volatile uint8_t ambient_r = 5;
+volatile uint8_t ambient_g = 2;
 volatile uint8_t ambient_b = 0;
 
 
