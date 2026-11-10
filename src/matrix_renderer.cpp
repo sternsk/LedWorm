@@ -111,6 +111,9 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     std::fill_n(background, PIXEL_COUNT, ambient);
     for (size_t i = 0; players != nullptr && i < count; ++i) {
         const auto &player = players[i];
+        const bool display_overlay = (clock && clock->active) ||
+            (marquee && marquee->active && !marquee->initial_animation);
+        if (player.automatic && display_overlay) continue;
         const auto tint = playerColor(player.hue, player.saturation, 5);
         for (unsigned cell = 0; cell < PIXEL_COUNT; ++cell) {
             const auto physical = matrixPixelIndex(cell % MATRIX_WIDTH, cell / MATRIX_WIDTH);
@@ -201,9 +204,9 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
         const auto hour = endpoint((clock->hour % 12 + clock->minute / 60.0f) / 12.0f, 4.0f);
         const auto minute = endpoint(clock->minute / 60.0f, 6.0f);
         const auto second = endpoint(clock->second / 60.0f, 6.0f);
-        drawClockHand(output_buffer, hour.first, hour.second, {72, 40, 8});
-        drawClockHand(output_buffer, minute.first, minute.second, {8, 64, 72});
-        drawClockHand(output_buffer, second.first, second.second, {72, 4, 4});
-        drawClockPixel(output_buffer, 8, 8, {96, 96, 96});
+        drawClockHand(output_buffer, hour.first, hour.second, {12, 12, 12});
+        drawClockHand(output_buffer, minute.first, minute.second, {12, 12, 12});
+        drawClockHand(output_buffer, second.first, second.second, {12, 12, 12});
+        drawClockPixel(output_buffer, 8, 8, {12, 12, 12});
     }
 }

@@ -36,6 +36,7 @@ struct player_frame_t {
     uint8_t body[LedWorm::MAX_LENGTH] = {};
     uint8_t area[LedWorm::AREA_BYTES] = {};
     uint8_t cut[LedWorm::AREA_BYTES] = {};
+    bool automatic = false;
 };
 
 bool player_manager_init();
@@ -53,6 +54,7 @@ struct vitamin_frame_t {
 constexpr size_t MARQUEE_TEXT_MAX = 32;
 struct marquee_frame_t {
     bool active = false;
+    bool initial_animation = false;
     int16_t x = 0;
     char text[MARQUEE_TEXT_MAX + 1] = {};
 };

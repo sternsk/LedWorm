@@ -261,13 +261,35 @@ static void marquee() {
     auto center = renderer.pixels()[matrixPixelIndex(8, 8)];
     auto hour_tip = renderer.pixels()[matrixPixelIndex(12, 8)];
     auto second_tip = renderer.pixels()[matrixPixelIndex(8, 14)];
-    assert(center.r == 96 && center.g == 96 && center.b == 96);
-    assert(hour_tip.r == 72 && hour_tip.g == 40 && hour_tip.b == 8);
-    assert(second_tip.r == 72 && second_tip.g == 4 && second_tip.b == 4);
+    assert(center.r == 12 && center.g == 12 && center.b == 12);
+    assert(hour_tip.r == 12 && hour_tip.g == 12 && hour_tip.b == 12);
+    assert(second_tip.r == 12 && second_tip.g == 12 && second_tip.b == 12);
 
     assert(setMarqueeText("HI"));
     updateClockFrame(clock);
     assert(!clock.active); // A non-empty marquee disables clock mode server-side.
+
+    player_frame_t automatic = {1, 2, 2, 0, 63};
+    automatic.automatic = true;
+    marquee_frame_t later_text;
+    later_text.active = true;
+    MatrixRenderer hidden_by_text;
+    hidden_by_text.render(&automatic, 1, {0, 0, 0}, nullptr, &later_text);
+    assert(hidden_by_text.pixels()[matrixPixelIndex(2, 2)].r == 0);
+
+    later_text.initial_animation = true;
+    MatrixRenderer visible_at_start;
+    visible_at_start.render(&automatic, 1, {0, 0, 0}, nullptr, &later_text);
+    assert(visible_at_start.pixels()[matrixPixelIndex(2, 2)].r == 63);
+
+    clock = {true, 3, 0, 0};
+    MatrixRenderer hidden_by_clock;
+    hidden_by_clock.render(&automatic, 1, {0, 0, 0}, nullptr, nullptr, &clock);
+    assert(hidden_by_clock.pixels()[matrixPixelIndex(2, 2)].r == 0);
+
+    MatrixRenderer visible_without_overlay;
+    visible_without_overlay.render(&automatic, 1, {0, 0, 0});
+    assert(visible_without_overlay.pixels()[matrixPixelIndex(2, 2)].r == 63);
 }
 
 static void vitamins() {

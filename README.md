@@ -89,6 +89,10 @@ per SNTP aus dem Internet und rechnet sie nach deutscher Ortszeit samt Sommerzei
 um. Bis zur ersten erfolgreichen Synchronisation bleibt die Uhr unsichtbar;
 nach einer Synchronisation läuft sie bei einer Netzunterbrechung weiter. Ein
 kalt gestartetes Offline-Spiel besitzt dagegen keine gültige Internetzeit.
+Die drei Zeiger werden einheitlich mit RGB `(12, 12, 12)` dargestellt. Ein
+automatisch gesteuerter Wurm bleibt während der anfänglichen `L e d w o r m`-
+Animation sichtbar. Bei einer später aktivierten Uhr oder einem eingegebenen
+Lauftext wird er ausgeblendet; ohne diese Anzeigen ist er wieder sichtbar.
 
 ## Vitamine und Punkte
 

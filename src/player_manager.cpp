@@ -315,6 +315,7 @@ size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
                 player.worm.y_position, player.hue,
                 player.worm.brightness};
             auto &frame = frames[count - 1];
+            frame.automatic = automatic;
             frame.saturation = player.saturation;
             frame.body_count = player.worm.bodyCount();
             memcpy(frame.area, player.worm.claimedArea(), sizeof(frame.area));
@@ -386,6 +387,7 @@ void updateMarqueeFrame(uint64_t now, marquee_frame_t &frame) {
     const size_t length = strlen(marquee_text);
     if (length) {
         memcpy(frame.text, marquee_text, length + 1);
+        frame.initial_animation = marquee_version == 0;
         const unsigned width = unsigned(length * 6 - 1);
         const unsigned travel = MATRIX_WIDTH + width + 6;
         const unsigned phase = unsigned((now - marquee_started) / 120000) % travel;
