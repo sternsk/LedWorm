@@ -72,6 +72,15 @@ und `can_reset_wifi`. Die Position bleibt im Protokoll verfügbar; das GUI zeigt
 stattdessen den eigenen Punktestand.
 Ein Helligkeitskommando erhält ebenfalls den bestätigten Serverzustand zurück.
 
+Das Controller-GUI besitzt außerdem ein Lauftextfeld. Eine Nachricht der Form
+`{"type":"marquee_text","text":"HELLO"}` setzt einen globalen Text mit bis zu
+32 druckbaren ASCII-Zeichen; ein leerer Text beendet ihn. Der ESP32 zeichnet
+Großbuchstaben, Ziffern und einige Satzzeichen als 5×7-Schrift. Kleinbuchstaben
+werden groß dargestellt, unbekannte druckbare Zeichen als Fragezeichen. Der
+Text läuft mit einer Spalte pro 120 ms von rechts nach links durch die mittleren
+sieben Matrixzeilen und wiederholt sich nach einer kurzen Pause. Er wird in
+dezentem Weiß über Würmern, Vitaminen und Flächen gezeichnet.
+
 ## Vitamine und Punkte
 
 Nach drei Sekunden ohne gültige Joysticknachricht steuert der Wurm automatisch

@@ -50,9 +50,18 @@ struct vitamin_frame_t {
     uint64_t age_us = 0;
 };
 
+constexpr size_t MARQUEE_TEXT_MAX = 32;
+struct marquee_frame_t {
+    bool active = false;
+    int16_t x = 0;
+    char text[MARQUEE_TEXT_MAX + 1] = {};
+};
+
 // Vitamin and player snapshots are captured under the same lock.
 size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
                           vitamin_frame_t *vitamin = nullptr);
+bool setMarqueeText(const char *text);
+void updateMarqueeFrame(uint64_t now, marquee_frame_t &frame);
 
 struct player_state_t {
     uint32_t player_id;

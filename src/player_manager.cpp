@@ -14,6 +14,10 @@ static uint64_t vitamin_since = 0;
 static bool vitamin_clock_started = false;
 static bool waiting_for_first_vitamin = true;
 static std::minstd_rand vitamin_random{1};
+static char marquee_text[MARQUEE_TEXT_MAX + 1] = {};
+static uint32_t marquee_version = 0;
+static uint32_t marquee_rendered_version = 0;
+static uint64_t marquee_started = 0;
 constexpr uint64_t FIRST_VITAMIN_DELAY = 5000000;
 constexpr uint64_t VITAMIN_DELAY = 3000000;
 constexpr uint64_t AUTOPILOT_DELAY = 3000000;
@@ -263,6 +267,9 @@ void resetPlayersForTest() {
     vitamin_clock_started = false;
     waiting_for_first_vitamin = true;
     nextPlayerId = 1;
+    marquee_text[0] = '\0';
+    marquee_version = marquee_rendered_version = 0;
+    marquee_started = 0;
     xSemaphoreGive(playerMutex);
 }
 #endif
@@ -318,6 +325,41 @@ size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
     if (vitamin_snapshot) *vitamin_snapshot = vitamin;
     xSemaphoreGive(playerMutex);
     return count;
+}
+
+bool setMarqueeText(const char *text) {
+    if (!text || playerMutex == nullptr) return false;
+    const size_t length = strlen(text);
+    if (length > MARQUEE_TEXT_MAX) return false;
+    for (size_t i = 0; i < length; ++i) {
+        const unsigned char character = text[i];
+        if (character < 32 || character > 126) return false;
+    }
+    if (xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
+    memcpy(marquee_text, text, length + 1);
+    ++marquee_version;
+    xSemaphoreGive(playerMutex);
+    return true;
+}
+
+void updateMarqueeFrame(uint64_t now, marquee_frame_t &frame) {
+    frame = {};
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    if (marquee_rendered_version != marquee_version || now < marquee_started) {
+        marquee_rendered_version = marquee_version;
+        marquee_started = now;
+    }
+    const size_t length = strlen(marquee_text);
+    if (length) {
+        memcpy(frame.text, marquee_text, length + 1);
+        const unsigned width = unsigned(length * 6 - 1);
+        const unsigned travel = MATRIX_WIDTH + width + 6;
+        const unsigned phase = unsigned((now - marquee_started) / 120000) % travel;
+        frame.x = int16_t(MATRIX_WIDTH) - int16_t(phase);
+        frame.active = true;
+    }
+    xSemaphoreGive(playerMutex);
 }
 
 bool updateBrightness(int socketFd, double value) {

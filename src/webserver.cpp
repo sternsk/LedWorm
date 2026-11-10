@@ -171,6 +171,11 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                         }
                     }
                 }
+            } else if (cJSON_IsString(type) && strcmp(type->valuestring, "marquee_text") == 0) {
+                const cJSON *text = cJSON_GetObjectItemCaseSensitive(root, "text");
+                if (!cJSON_IsString(text) || !setMarqueeText(text->valuestring)) {
+                    ESP_LOGW(TAG, "Ungültiger Lauftext von fd=%d", client_fd);
+                }
             }
             cJSON_Delete(root);
         }

@@ -38,6 +38,20 @@ assert.equal(a.nodes['worm-score'].textContent, 0);
 assert.equal(b.nodes['worm-score'].textContent, 7);
 assert.equal(a.nodes['worm-length'].textContent, 8);
 assert.equal(a.nodes['value-slider'].disabled, false);
+assert.equal(a.nodes['marquee-send'].disabled, false);
+a.nodes['marquee-text'].value = 'HELLO 42!';
+a.nodes['marquee-form'].onsubmit({preventDefault(){}});
+assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
+    {type:'marquee_text',text:'HELLO 42!'});
+assert.match(a.nodes['marquee-status'].textContent, /angezeigt/);
+a.nodes['marquee-text'].value = '';
+a.nodes['marquee-form'].onsubmit({preventDefault(){}});
+assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
+    {type:'marquee_text',text:''});
+a.nodes['marquee-text'].value = 'Grüße';
+const beforeInvalidText = a.socket.sent.length;
+a.nodes['marquee-form'].onsubmit({preventDefault(){}});
+assert.equal(a.socket.sent.length, beforeInvalidText);
 a.nodes['value-slider'].listeners.input({target:{value:'0'}});
 assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))), {type:'value',value:0});
 assert.equal(a.nodes['brightness-preview'].textContent, 0);
@@ -57,6 +71,7 @@ assert.equal(a.socket.sent.at(-1).type, 'state');
 a.socket.readyState = 3; a.socket.onclose();
 assert.equal(a.intervals.size, 0);
 assert.equal(a.nodes['value-slider'].disabled, true);
+assert.equal(a.nodes['marquee-send'].disabled, true);
 assert.equal(a.nodes['worm-score'].textContent, '–');
 assert.equal(a.nodes['worm-brightness'].textContent, '–');
 const sentBefore = a.socket.sent.length;

@@ -6,6 +6,7 @@
 #include <thread>
 #include <initializer_list>
 #include <utility>
+#include <cstring>
 
 static void movement() {
     LedWorm tuned;
@@ -215,6 +216,38 @@ static void rendering() {
         assert(color.r == 63 || color.g == 63 || color.b == 63);
     }
     for (int i = 0; i < MAX_PLAYERS; ++i) removePlayer(10 + i);
+}
+
+static void marquee() {
+    resetPlayersForTest();
+    marquee_frame_t frame;
+    assert(setMarqueeText("HI"));
+    updateMarqueeFrame(1000000, frame);
+    assert(frame.active && frame.x == MATRIX_WIDTH && strcmp(frame.text, "HI") == 0);
+    updateMarqueeFrame(1120000, frame);
+    assert(frame.x == MATRIX_WIDTH - 1);
+    const unsigned width = 11, travel = MATRIX_WIDTH + width + 6;
+    updateMarqueeFrame(1000000 + uint64_t(travel) * 120000, frame);
+    assert(frame.x == MATRIX_WIDTH);
+    assert(!setMarqueeText("Gr\xc3\xbc\xc3\x9f"));
+    assert(!setMarqueeText("123456789012345678901234567890123"));
+
+    assert(setMarqueeText("H"));
+    updateMarqueeFrame(2000000, frame);
+    updateMarqueeFrame(2000000 + uint64_t(MATRIX_WIDTH) * 120000, frame);
+    assert(frame.x == 0);
+    MatrixRenderer renderer;
+    renderer.render(nullptr, 0, {0, 0, 0}, nullptr, &frame);
+    for (uint8_t y = 4; y <= 10; ++y) {
+        const auto pixel = renderer.pixels()[matrixPixelIndex(0, y)];
+        assert(pixel.r == 96 && pixel.g == 96 && pixel.b == 96);
+    }
+    assert(renderer.pixels()[matrixPixelIndex(5, 7)].r == 0);
+    assert(setMarqueeText(""));
+    updateMarqueeFrame(3000000, frame);
+    assert(!frame.active);
+    renderer.render(nullptr, 0, {0, 0, 0}, nullptr, &frame);
+    assert(renderer.pixels()[matrixPixelIndex(0, 7)].r == 0);
 }
 
 static void vitamins() {
@@ -625,6 +658,7 @@ int main() {
     players(); puts("PASS: 8 Spieler, Eingaben, Reconnect und parallele Zugriffe");
     resetPlayersForTest();
     rendering(); puts("PASS: Matrixmapping, mehrere Köpfe, Mischung und Fade");
+    marquee(); puts("PASS: marquee validation, timing, centered 5x7 rendering and clearing");
     resetPlayersForTest();
     vitamins(); puts("PASS: vitamin timing, free spawn, pickup, per-player score, reconnect, overlay");
     resetPlayersForTest();

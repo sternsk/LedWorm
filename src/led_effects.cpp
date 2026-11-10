@@ -45,9 +45,12 @@ void led_render_task(void *) {
     while (true) {
         static player_frame_t players[MAX_PLAYERS];
         vitamin_frame_t vitamin;
-        const size_t count = updatePlayerFrames(esp_timer_get_time(), players, MAX_PLAYERS, &vitamin);
+        marquee_frame_t marquee;
+        const uint64_t now = esp_timer_get_time();
+        const size_t count = updatePlayerFrames(now, players, MAX_PLAYERS, &vitamin);
+        updateMarqueeFrame(now, marquee);
         renderer.render(players, count,
-            {ambient_r.load(), ambient_g.load(), ambient_b.load()}, &vitamin);
+            {ambient_r.load(), ambient_g.load(), ambient_b.load()}, &vitamin, &marquee);
         const auto *pixels = renderer.pixels();
         for (size_t i = 0; i < PIXEL_COUNT; ++i) {
             ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, i,

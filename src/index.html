@@ -149,6 +149,18 @@
                 <input type="color" id="ambient-color-input" value="#000000" style="width: 80px; height: 40px; border: none; cursor: pointer;">
             </div>
         </div>
+        <div class="join-box">
+            <form id="marquee-form">
+                <label for="marquee-text">Lauftext auf der Matrix:</label>
+                <div class="input-group">
+                    <input type="text" id="marquee-text" maxlength="32" autocomplete="off"
+                           placeholder="LEDWORM">
+                    <button type="submit" id="marquee-send" disabled>Anzeigen</button>
+                </div>
+                <small>Bis zu 32 Zeichen. Ein leeres Feld beendet den Lauftext.</small>
+                <p id="marquee-status" role="status" aria-live="polite"></p>
+            </form>
+        </div>
     </div>
 
     <div class="container status-box" id="wifi-reset-section" hidden>
@@ -231,6 +243,25 @@
         const brightnessPreview = document.getElementById('brightness-preview');
         const ambientColorInput = document.getElementById('ambient-color-input');
         const valueSlider = document.getElementById('value-slider');
+        const marqueeForm = document.getElementById('marquee-form');
+        const marqueeText = document.getElementById('marquee-text');
+        const marqueeSend = document.getElementById('marquee-send');
+        const marqueeStatus = document.getElementById('marquee-status');
+
+        marqueeForm.onsubmit = event => {
+            event.preventDefault();
+            const text = marqueeText.value;
+            if (!/^[\x20-\x7e]{0,32}$/.test(text)) {
+                marqueeStatus.textContent = 'Bitte höchstens 32 einfache Zeichen verwenden.';
+                return;
+            }
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                marqueeStatus.textContent = 'Keine Verbindung zu LedWorm.';
+                return;
+            }
+            ws.send(JSON.stringify({type:'marquee_text', text}));
+            marqueeStatus.textContent = text ? 'Lauftext wird angezeigt.' : 'Lauftext wurde beendet.';
+        };
         
         let stateTimer;
         let haveState = false;
@@ -242,6 +273,7 @@
             ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`);
             ws.onopen = () => {
                 connectionState.textContent = 'Verbunden';
+                marqueeSend.disabled = false;
                 const requestState = () => {
                     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'state'}));
                 };
@@ -286,6 +318,7 @@
                 wormScore.textContent = wormLength.textContent = wormBrightness.textContent = '–';
                 brightnessPreview.textContent = '–';
                 valueSlider.disabled = true;
+                marqueeSend.disabled = true;
                 if (wifiResetComplete) {
                     connectionState.textContent = 'WLAN zurückgesetzt';
                 } else {
