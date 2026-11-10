@@ -16,6 +16,7 @@ struct player_t {
     uint64_t last_frame = 0;
     bool input_pending = false;
     bool input_clock_started = false;
+    bool force_automatic = false;
     float velocity_x = 0;
     float velocity_y = 0;
 };
@@ -63,3 +64,6 @@ struct player_state_t {
 bool updateBrightness(int client_fd, double value);
 // Read-only snapshot: telemetry must not advance movement or its clock.
 bool getPlayerState(int client_fd, player_state_t &state);
+#ifdef LEDWORM_HOST_TEST
+void resetPlayersForTest();
+#endif

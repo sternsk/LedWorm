@@ -21,7 +21,11 @@ Der Render-Task aktualisiert alle Spieler mit demselben Zeitstempel und
 ohne diesen Lock. Pro Frame werden alle Köpfe zusammengeführt und einmal an
 die Hardware gesendet. Überlappende Köpfe mischen ihre Farben; alte Positionen
 blenden zur gewählten Hintergrundfarbe aus. Beim Verbindungsende wird der
-Spielerplatz freigegeben. Die Wurmkörper bestehen aus den zuletzt besuchten
+Spielerplatz freigegeben. Der letzte verbleibende Wurm bildet eine Ausnahme:
+Beim Schließen seiner WebSocket-Verbindung bleibt er mit ID, Punkten, Länge,
+Körper und beanspruchter Fläche erhalten und wechselt sofort in die automatische
+Steuerung. Eine spätere erste Verbindung übernimmt diesen Wurm wieder. Dadurch
+bleibt stets mindestens ein aktiver Wurm bestehen. Die Wurmkörper bestehen aus den zuletzt besuchten
 LED-Zellen; dahinter bleibt ein ausblendender Schweif. Trifft der Kopf eine
 eigene Körperzelle, wird die gerade geschlossene Schleife entfernt. Der
 Schnittpunkt wird zum neuen Kopf, das ältere Schwanzstück bleibt erhalten.

@@ -128,7 +128,16 @@ static void players() {
     input.join();
     removePlayer(99);
     for (int i = 1; i < MAX_PLAYERS; ++i) removePlayer(10 + i);
-    assert(updatePlayerFrames(21000000, frames, MAX_PLAYERS) == 0);
+    assert(updatePlayerFrames(21000000, frames, MAX_PLAYERS) == 1);
+    const auto retained = frames[0];
+    assert(!getPlayerState(17, state));
+    assert(addPlayer(777));
+    assert(getPlayerState(777, state));
+    assert(state.player_id == retained.player_id);
+    assert(state.x == retained.x && state.y == retained.y);
+    assert(state.active_players == 1);
+    removePlayer(777);
+    assert(updatePlayerFrames(21020000, frames, MAX_PLAYERS) == 1);
 }
 
 static void rendering() {
@@ -573,11 +582,16 @@ static void boundedMovement() {
 int main() {
     movement(); puts("PASS: unabhängige Bewegung und Matrixgrenzen");
     players(); puts("PASS: 8 Spieler, Eingaben, Reconnect und parallele Zugriffe");
+    resetPlayersForTest();
     rendering(); puts("PASS: Matrixmapping, mehrere Köpfe, Mischung und Fade");
+    resetPlayersForTest();
     vitamins(); puts("PASS: vitamin timing, free spawn, pickup, per-player score, reconnect, overlay");
+    resetPlayersForTest();
     bodies(); puts("PASS: growing bodies, stationary head, wraparound, ring storage and rendering");
     selfCuts(); puts("PASS: self-cut, retained tail, enclosed area value 5, edge crossing and reset");
+    resetPlayersForTest();
     autopilot(); puts("PASS: three-second autopilot, direct direction, manual takeover, pickup, independent timers");
+    resetPlayersForTest();
     boundedMovement(); puts("PASS: automatic edge bounds and manual wraparound");
     continuousAutopilot(); puts("PASS: continuous automatic movement over multiple vitamin cycles");
 }

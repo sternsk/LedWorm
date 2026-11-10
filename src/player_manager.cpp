@@ -31,9 +31,11 @@ static void movePlayer(player_t &player, uint64_t now) {
         player.last_input = now;
         player.input_clock_started = true;
         player.input_pending = false;
+        player.force_automatic = false;
     }
     float x = player.worm.joystick_x, y = player.worm.joystick_y;
-    const bool automatic = now - player.last_input >= AUTOPILOT_DELAY;
+    const bool automatic = player.force_automatic ||
+                           now - player.last_input >= AUTOPILOT_DELAY;
     if (automatic) {
         const float current_speed = std::hypot(player.velocity_x, player.velocity_y);
         float wanted_x = current_speed > 0 ? player.velocity_x : 1.0f;
@@ -184,6 +186,16 @@ bool addPlayer(int socketFd) {
             return false;
         }
     }
+    // A lone player survives without a socket and is reclaimed on reconnect.
+    for (auto &player : players) {
+        if (player.active && player.socketFd < 0) {
+            player.socketFd = socketFd;
+            player.worm.setJoystick(0, 0);
+            player.input_pending = true;
+            xSemaphoreGive(playerMutex);
+            return true;
+        }
+    }
     for (size_t i = 0; i < MAX_PLAYERS; ++i) {
         auto &player = players[i];
         if (!player.active) {
@@ -201,6 +213,7 @@ bool addPlayer(int socketFd) {
             player.score = 0;
             player.last_input = player.last_frame = 0;
             player.input_pending = player.input_clock_started = false;
+            player.force_automatic = false;
             player.velocity_x = player.velocity_y = 0;
             player.active = true;
             xSemaphoreGive(playerMutex);
@@ -214,8 +227,19 @@ bool addPlayer(int socketFd) {
 void removePlayer(int socketFd) {
     if (playerMutex == nullptr ||
         xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    size_t active_count = 0;
+    for (const auto &player : players) active_count += player.active;
     for (auto &player : players) {
         if (player.active && player.socketFd == socketFd) {
+            if (active_count == 1) {
+                // Keep the final worm alive under automatic control.
+                player.socketFd = -1;
+                player.worm.setJoystick(0, 0);
+                player.input_pending = false;
+                player.input_clock_started = true;
+                player.force_automatic = true;
+                break;
+            }
             player.worm.deactivate();
             player.active = false;
             player.socketFd = -1;
@@ -225,6 +249,20 @@ void removePlayer(int socketFd) {
     }
     xSemaphoreGive(playerMutex);
 }
+
+#ifdef LEDWORM_HOST_TEST
+void resetPlayersForTest() {
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    for (auto &player : players) player = {};
+    vitamin = {};
+    vitamin_since = 0;
+    vitamin_clock_started = false;
+    waiting_for_first_vitamin = true;
+    nextPlayerId = 1;
+    xSemaphoreGive(playerMutex);
+}
+#endif
 
 bool updateJoystick(int socketFd, float x, float y) {
     if (socketFd < 0 || !std::isfinite(x) || !std::isfinite(y) ||
