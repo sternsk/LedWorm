@@ -67,8 +67,8 @@ bis zur erneuten Anmeldung deaktiviert.
 
 WebSocket-Nachrichten: `{"type":"value","value":128}` setzt eine ganzzahlige
 Helligkeit; `{"type":"state"}` fragt einen unveränderlichen Snapshot ab.
-`player_state` liefert `id`, `x`, `y`, `length`, `brightness`, `count`, `score`
-und `can_reset_wifi`. Die Position bleibt im Protokoll verfügbar; das GUI zeigt
+`player_state` liefert `id`, `x`, `y`, `length`, `brightness`, `count`, `score`,
+`can_reset_wifi` und `clock_enabled`. Die Position bleibt im Protokoll verfügbar; das GUI zeigt
 stattdessen den eigenen Punktestand.
 Ein Helligkeitskommando erhält ebenfalls den bestätigten Serverzustand zurück.
 
@@ -80,6 +80,15 @@ werden groß dargestellt, unbekannte druckbare Zeichen als Fragezeichen. Der
 Text läuft mit einer Spalte pro 120 ms von rechts nach links durch die mittleren
 sieben Matrixzeilen und wiederholt sich nach einer kurzen Pause. Er wird in
 dezentem Weiß über Würmern, Vitaminen und Flächen gezeichnet.
+
+Die Checkbox **Uhrzeit anzeigen** schaltet stattdessen eine analoge Uhr mit
+Stundenmarkierungen sowie Stunden-, Minuten- und Sekundenzeiger ein. Beim
+Aktivieren wird ein laufender Text beendet. Jede Eingabe in das Lauftextfeld
+deaktiviert die Uhr unmittelbar wieder. Im Heimnetz bezieht LedWorm die Zeit
+per SNTP aus dem Internet und rechnet sie nach deutscher Ortszeit samt Sommerzeit
+um. Bis zur ersten erfolgreichen Synchronisation bleibt die Uhr unsichtbar;
+nach einer Synchronisation läuft sie bei einer Netzunterbrechung weiter. Ein
+kalt gestartetes Offline-Spiel besitzt dagegen keine gültige Internetzeit.
 
 ## Vitamine und Punkte
 

@@ -57,14 +57,15 @@ static esp_err_t send_player_state(httpd_req_t *req) {
     if (!getPlayerState(httpd_req_to_sockfd(req), state)) return ESP_FAIL;
     wifi_mode_t mode;
     const bool can_reset_wifi = esp_wifi_get_mode(&mode) == ESP_OK && mode == WIFI_MODE_STA;
-    char json[256];
+    char json[320];
     int length = snprintf(json, sizeof(json),
         "{\"type\":\"player_state\",\"id\":%lu,\"x\":%.3f,\"y\":%.3f,"
-        "\"length\":%u,\"brightness\":%u,\"count\":%u,\"score\":%lu,\"can_reset_wifi\":%s}",
+        "\"length\":%u,\"brightness\":%u,\"count\":%u,\"score\":%lu,"
+        "\"can_reset_wifi\":%s,\"clock_enabled\":%s}",
         static_cast<unsigned long>(state.player_id), state.x, state.y,
         unsigned(state.length), unsigned(state.brightness), unsigned(state.active_players),
         static_cast<unsigned long>(state.score),
-        can_reset_wifi ? "true" : "false");
+        can_reset_wifi ? "true" : "false", state.clock_enabled ? "true" : "false");
     if (length < 0 || size_t(length) >= sizeof(json)) return ESP_FAIL;
     httpd_ws_frame_t frame = {};
     frame.type = HTTPD_WS_TYPE_TEXT;
@@ -175,6 +176,11 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                 const cJSON *text = cJSON_GetObjectItemCaseSensitive(root, "text");
                 if (!cJSON_IsString(text) || !setMarqueeText(text->valuestring)) {
                     ESP_LOGW(TAG, "Ungültiger Lauftext von fd=%d", client_fd);
+                }
+            } else if (cJSON_IsString(type) && strcmp(type->valuestring, "clock") == 0) {
+                const cJSON *enabled = cJSON_GetObjectItemCaseSensitive(root, "enabled");
+                if (!cJSON_IsBool(enabled) || !setClockEnabled(cJSON_IsTrue(enabled))) {
+                    ESP_LOGW(TAG, "Ungueltiger Uhrmodus von fd=%d", client_fd);
                 }
             }
             cJSON_Delete(root);

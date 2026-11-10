@@ -57,11 +57,20 @@ struct marquee_frame_t {
     char text[MARQUEE_TEXT_MAX + 1] = {};
 };
 
+struct clock_frame_t {
+    bool active = false;
+    uint8_t hour = 0;
+    uint8_t minute = 0;
+    uint8_t second = 0;
+};
+
 // Vitamin and player snapshots are captured under the same lock.
 size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
                           vitamin_frame_t *vitamin = nullptr);
 bool setMarqueeText(const char *text);
 void updateMarqueeFrame(uint64_t now, marquee_frame_t &frame);
+bool setClockEnabled(bool enabled);
+void updateClockFrame(clock_frame_t &frame);
 
 struct player_state_t {
     uint32_t player_id;
@@ -71,6 +80,7 @@ struct player_state_t {
     uint8_t brightness;
     size_t active_players;
     uint32_t score;
+    bool clock_enabled;
 };
 
 bool updateBrightness(int client_fd, double value);

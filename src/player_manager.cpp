@@ -3,6 +3,7 @@
 #include <limits>
 #include <random>
 #include <cstring>
+#include <ctime>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
@@ -18,6 +19,7 @@ static char marquee_text[MARQUEE_TEXT_MAX + 1] = "L e d w o r m";
 static uint32_t marquee_version = 0;
 static uint32_t marquee_rendered_version = 0;
 static uint64_t marquee_started = 0;
+static bool clock_enabled = false;
 constexpr uint64_t FIRST_VITAMIN_DELAY = 5000000;
 constexpr uint64_t VITAMIN_DELAY = 3000000;
 constexpr uint64_t AUTOPILOT_DELAY = 3000000;
@@ -270,6 +272,7 @@ void resetPlayersForTest() {
     marquee_text[0] = '\0';
     marquee_version = marquee_rendered_version = 0;
     marquee_started = 0;
+    clock_enabled = false;
     xSemaphoreGive(playerMutex);
 }
 #endif
@@ -338,8 +341,38 @@ bool setMarqueeText(const char *text) {
     if (xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
     memcpy(marquee_text, text, length + 1);
     ++marquee_version;
+    if (length) clock_enabled = false;
     xSemaphoreGive(playerMutex);
     return true;
+}
+
+bool setClockEnabled(bool enabled) {
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
+    clock_enabled = enabled;
+    if (enabled && marquee_text[0]) {
+        marquee_text[0] = '\0';
+        ++marquee_version;
+    }
+    xSemaphoreGive(playerMutex);
+    return true;
+}
+
+void updateClockFrame(clock_frame_t &frame) {
+    frame = {};
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    const bool enabled = clock_enabled;
+    xSemaphoreGive(playerMutex);
+    if (!enabled) return;
+    const time_t now = time(nullptr);
+    if (now < 1704067200) return; // No plausible network time yet (2024-01-01 UTC).
+    struct tm local = {};
+    if (!localtime_r(&now, &local)) return;
+    frame.active = true;
+    frame.hour = uint8_t(local.tm_hour);
+    frame.minute = uint8_t(local.tm_min);
+    frame.second = uint8_t(local.tm_sec);
 }
 
 void updateMarqueeFrame(uint64_t now, marquee_frame_t &frame) {
@@ -389,7 +422,8 @@ bool getPlayerState(int socketFd, player_state_t &state) {
         if (player.socketFd == socketFd) own = &player;
     }
     if (own) state = {own->player_id, own->worm.x_position, own->worm.y_position,
-                     own->worm.length, own->worm.brightness, count, own->score};
+                     own->worm.length, own->worm.brightness, count, own->score,
+                     clock_enabled};
     xSemaphoreGive(playerMutex);
     return own != nullptr;
 }

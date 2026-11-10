@@ -240,7 +240,7 @@ static void marquee() {
     renderer.render(nullptr, 0, {0, 0, 0}, nullptr, &frame);
     for (uint8_t y = 4; y <= 10; ++y) {
         const auto pixel = renderer.pixels()[matrixPixelIndex(0, y)];
-        assert(pixel.r == 96 && pixel.g == 96 && pixel.b == 96);
+        assert(pixel.r == 12 && pixel.g == 12 && pixel.b == 12);
     }
     assert(renderer.pixels()[matrixPixelIndex(5, 7)].r == 0);
     assert(setMarqueeText(""));
@@ -248,6 +248,26 @@ static void marquee() {
     assert(!frame.active);
     renderer.render(nullptr, 0, {0, 0, 0}, nullptr, &frame);
     assert(renderer.pixels()[matrixPixelIndex(0, 7)].r == 0);
+
+    clock_frame_t clock;
+    assert(setClockEnabled(true));
+    updateMarqueeFrame(4000000, frame);
+    assert(!frame.active); // Clock mode clears the marquee.
+    updateClockFrame(clock);
+    assert(clock.active && clock.hour < 24 && clock.minute < 60 && clock.second < 60);
+
+    clock = {true, 3, 0, 0};
+    renderer.render(nullptr, 0, {0, 0, 0}, nullptr, nullptr, &clock);
+    auto center = renderer.pixels()[matrixPixelIndex(8, 8)];
+    auto hour_tip = renderer.pixels()[matrixPixelIndex(12, 8)];
+    auto second_tip = renderer.pixels()[matrixPixelIndex(8, 14)];
+    assert(center.r == 96 && center.g == 96 && center.b == 96);
+    assert(hour_tip.r == 72 && hour_tip.g == 40 && hour_tip.b == 8);
+    assert(second_tip.r == 72 && second_tip.g == 4 && second_tip.b == 4);
+
+    assert(setMarqueeText("HI"));
+    updateClockFrame(clock);
+    assert(!clock.active); // A non-empty marquee disables clock mode server-side.
 }
 
 static void vitamins() {

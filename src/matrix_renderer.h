@@ -15,7 +15,8 @@ class MatrixRenderer {
 public:
     void render(const player_frame_t *players, size_t count, rgb_pixel_t ambient,
                 const vitamin_frame_t *vitamin = nullptr,
-                const marquee_frame_t *marquee = nullptr);
+                const marquee_frame_t *marquee = nullptr,
+                const clock_frame_t *clock = nullptr);
     const rgb_pixel_t *pixels() const { return output_buffer; }
 private:
     rgb_pixel_t frame_buffer[PIXEL_COUNT] = {};

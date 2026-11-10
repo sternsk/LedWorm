@@ -1,11 +1,14 @@
 #include "wifi_manager.h"
 #include "globals.h"
+#include <cstdlib>
+#include <ctime>
 #include <cstring>
 #include "cJSON.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_netif_sntp.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -23,6 +26,7 @@ EventGroupHandle_t events;
 wifi_manager_callback_t notify;
 httpd_handle_t setup_server;
 bool mdns_running = false;
+bool time_sync_started = false;
 extern const uint8_t html_start[] asm("_binary_wifi_setup_html_start");
 extern const uint8_t html_end[] asm("_binary_wifi_setup_html_end");
 
@@ -42,6 +46,22 @@ void start_mdns() {
     }
     mdns_running = true;
     ESP_LOGI(TAG, "Spiel erreichbar unter http://ledworm.local/");
+}
+
+void start_time_sync() {
+    if (time_sync_started) return;
+    // German local time including the EU daylight-saving transition rules.
+    setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+    tzset();
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    const esp_err_t err = esp_netif_sntp_init(&config);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Zeitsynchronisation konnte nicht gestartet werden (%s)",
+                 esp_err_to_name(err));
+        return;
+    }
+    time_sync_started = true;
+    ESP_LOGI(TAG, "Internet-Zeitsynchronisation gestartet");
 }
 
 esp_err_t store(const wifi_config_t *config) {
@@ -245,6 +265,7 @@ void manager(void *) {
                 if (!serving) {
                     notify(true);
                     start_mdns();
+                    start_time_sync();
                     serving = true;
                 }
             } else if (now - since >= CONNECTION_TIMEOUT) {

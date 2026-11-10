@@ -160,6 +160,10 @@
                 <small>Bis zu 32 Zeichen. Ein leeres Feld beendet den Lauftext.</small>
                 <p id="marquee-status" role="status" aria-live="polite"></p>
             </form>
+            <label style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                <input type="checkbox" id="clock-enabled" disabled>
+                Uhrzeit anzeigen
+            </label>
         </div>
     </div>
 
@@ -247,6 +251,24 @@
         const marqueeText = document.getElementById('marquee-text');
         const marqueeSend = document.getElementById('marquee-send');
         const marqueeStatus = document.getElementById('marquee-status');
+        const clockEnabled = document.getElementById('clock-enabled');
+
+        clockEnabled.addEventListener('change', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(JSON.stringify({type:'clock', enabled:clockEnabled.checked}));
+            if (clockEnabled.checked) {
+                marqueeText.value = '';
+                marqueeStatus.textContent = 'Analoge Uhr wird angezeigt.';
+            }
+        });
+
+        marqueeText.addEventListener('input', () => {
+            if (!clockEnabled.checked) return;
+            clockEnabled.checked = false;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type:'clock', enabled:false}));
+            }
+        });
 
         marqueeForm.onsubmit = event => {
             event.preventDefault();
@@ -274,6 +296,7 @@
             ws.onopen = () => {
                 connectionState.textContent = 'Verbunden';
                 marqueeSend.disabled = false;
+                clockEnabled.disabled = false;
                 const requestState = () => {
                     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'state'}));
                 };
@@ -298,6 +321,7 @@
                 wormScore.textContent = data.score;
                 wormLength.textContent = data.length;
                 wormBrightness.textContent = `${data.brightness} (${Math.round(data.brightness / 255 * 100)} %)`;
+                clockEnabled.checked = data.clock_enabled === true;
                 valueSlider.disabled = false;
                 if (!adjustingBrightness) {
                     valueSlider.value = data.brightness;
@@ -319,6 +343,7 @@
                 brightnessPreview.textContent = '–';
                 valueSlider.disabled = true;
                 marqueeSend.disabled = true;
+                clockEnabled.disabled = true;
                 if (wifiResetComplete) {
                     connectionState.textContent = 'WLAN zurückgesetzt';
                 } else {

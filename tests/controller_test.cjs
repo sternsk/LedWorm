@@ -39,7 +39,16 @@ assert.equal(b.nodes['worm-score'].textContent, 7);
 assert.equal(a.nodes['worm-length'].textContent, 8);
 assert.equal(a.nodes['value-slider'].disabled, false);
 assert.equal(a.nodes['marquee-send'].disabled, false);
+assert.equal(a.nodes['clock-enabled'].disabled, false);
+a.nodes['clock-enabled'].checked = true;
+a.nodes['clock-enabled'].listeners.change();
+assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
+    {type:'clock',enabled:true});
 a.nodes['marquee-text'].value = 'HELLO 42!';
+a.nodes['marquee-text'].listeners.input();
+assert.equal(a.nodes['clock-enabled'].checked, false);
+assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
+    {type:'clock',enabled:false});
 a.nodes['marquee-form'].onsubmit({preventDefault(){}});
 assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
     {type:'marquee_text',text:'HELLO 42!'});
@@ -57,12 +66,13 @@ assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))), {type:'value'
 assert.equal(a.nodes['brightness-preview'].textContent, 0);
 // Confirmed brightness only changes when the server acknowledges it.
 assert.equal(a.nodes['worm-brightness'].textContent, '63 (25 %)');
-a.receive({id:1,score:1,length:9,brightness:0,count:2});
+a.receive({id:1,score:1,length:9,brightness:0,count:2,clock_enabled:true});
 assert.equal(a.nodes['worm-length'].textContent, 9);
 assert.equal(b.nodes['worm-length'].textContent, 8);
 assert.equal(a.nodes['worm-score'].textContent, 1);
 assert.equal(b.nodes['worm-score'].textContent, 7);
 assert.equal(a.nodes['worm-brightness'].textContent, '0 (0 %)');
+assert.equal(a.nodes['clock-enabled'].checked, true);
 assert.equal(b.nodes['worm-brightness'].textContent, '200 (78 %)');
 assert.equal(b.socket.sent.length, 1);
 a.socket.onmessage({data:'invalid json'});
@@ -72,6 +82,7 @@ a.socket.readyState = 3; a.socket.onclose();
 assert.equal(a.intervals.size, 0);
 assert.equal(a.nodes['value-slider'].disabled, true);
 assert.equal(a.nodes['marquee-send'].disabled, true);
+assert.equal(a.nodes['clock-enabled'].disabled, true);
 assert.equal(a.nodes['worm-score'].textContent, '–');
 assert.equal(a.nodes['worm-brightness'].textContent, '–');
 const sentBefore = a.socket.sent.length;

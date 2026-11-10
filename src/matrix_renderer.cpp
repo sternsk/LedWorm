@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cctype>
 #include <cstring>
+#include <utility>
 
 size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
     if (serpentine && (y % 2) != 0) x = MATRIX_WIDTH - 1 - x;
@@ -80,9 +81,29 @@ static uint8_t glyphColumn(char character, unsigned column) {
     return question[column];
 }
 
+static void drawClockPixel(rgb_pixel_t *buffer, int x, int y, rgb_pixel_t color) {
+    if (x < 0 || x >= MATRIX_WIDTH || y < 0 || y >= MATRIX_HEIGHT) return;
+    buffer[matrixPixelIndex(uint8_t(x), uint8_t(y))] = color;
+}
+
+static void drawClockHand(rgb_pixel_t *buffer, int x1, int y1, rgb_pixel_t color) {
+    int x0 = 8, y0 = 8;
+    const int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    const int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int error = dx + dy;
+    for (;;) {
+        drawClockPixel(buffer, x0, y0, color);
+        if (x0 == x1 && y0 == y1) break;
+        const int twice = 2 * error;
+        if (twice >= dy) { error += dy; x0 += sx; }
+        if (twice <= dx) { error += dx; y0 += sy; }
+    }
+}
+
 void MatrixRenderer::render(const player_frame_t *players, size_t count,
                             rgb_pixel_t ambient, const vitamin_frame_t *vitamin,
-                            const marquee_frame_t *marquee) {
+                            const marquee_frame_t *marquee,
+                            const clock_frame_t *clock) {
     rgb_pixel_t heads[PIXEL_COUNT] = {};
     bool occupied[PIXEL_COUNT] = {};
     rgb_pixel_t background[PIXEL_COUNT];
@@ -161,5 +182,28 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
                 }
             }
         }
+    }
+    if (clock && clock->active) {
+        constexpr float pi = 3.14159265358979323846f;
+        constexpr float center = 7.5f;
+        for (unsigned marker = 0; marker < 12; ++marker) {
+            const float angle = float(marker) * 2.0f * pi / 12.0f;
+            drawClockPixel(output_buffer,
+                int(std::lround(center + std::sin(angle) * 7.0f)),
+                int(std::lround(center + std::cos(angle) * 7.0f)), {16, 16, 16});
+        }
+        const auto endpoint = [center, pi](float units, float length) {
+            const float angle = units * 2.0f * pi;
+            return std::pair<int, int>{
+                int(std::lround(center + std::sin(angle) * length)),
+                int(std::lround(center + std::cos(angle) * length))};
+        };
+        const auto hour = endpoint((clock->hour % 12 + clock->minute / 60.0f) / 12.0f, 4.0f);
+        const auto minute = endpoint(clock->minute / 60.0f, 6.0f);
+        const auto second = endpoint(clock->second / 60.0f, 6.0f);
+        drawClockHand(output_buffer, hour.first, hour.second, {72, 40, 8});
+        drawClockHand(output_buffer, minute.first, minute.second, {8, 64, 72});
+        drawClockHand(output_buffer, second.first, second.second, {72, 4, 4});
+        drawClockPixel(output_buffer, 8, 8, {96, 96, 96});
     }
 }
