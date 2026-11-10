@@ -61,6 +61,7 @@ void LedWorm::rememberPosition(float x, float y) {
     const unsigned row = int(wrapPosition(y, MATRIX_HEIGHT) + 0.5f) % MATRIX_HEIGHT;
     const uint8_t cell = row * MATRIX_WIDTH + column;
     if (path_count && path[path_head] == cell) return;
+    ++movement_steps;
     for (unsigned age = 1; age < bodyCount(); ++age) {
         if (bodyCell(age) != cell) continue;
         encloseArea(cell, age);
@@ -89,6 +90,7 @@ bool LedWorm::init(uint32_t playerId) {
     clock_started = false;
     path_count = 0;
     path_head = 0;
+    movement_steps = 0;
     memset(area, 0, sizeof(area));
     memset(cut, 0, sizeof(cut));
     active = playerId != 0;

@@ -23,6 +23,7 @@ public:
     uint8_t bodyCell(unsigned age) const {
         return path[(path_head + MAX_LENGTH - age) % MAX_LENGTH];
     }
+    uint32_t movementSteps() const { return movement_steps; }
     const uint8_t *claimedArea() const { return area; }
     const uint8_t *cutCells() const { return cut; }
 
@@ -32,6 +33,7 @@ private:
     uint8_t path[MAX_LENGTH] = {};
     unsigned path_head = 0;
     uint8_t path_count = 0;
+    uint32_t movement_steps = 0;
     uint8_t area[AREA_BYTES] = {};
     uint8_t cut[AREA_BYTES] = {};
     void encloseArea(uint8_t cell, unsigned intersection);

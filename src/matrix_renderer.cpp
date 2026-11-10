@@ -7,19 +7,24 @@ size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
     return size_t(y) * MATRIX_WIDTH + x;
 }
 
-static rgb_pixel_t playerColor(uint8_t hue, uint8_t value) {
+static rgb_pixel_t playerColor(uint8_t hue, uint8_t saturation, uint8_t value) {
     const uint8_t region = hue / 43;
     const uint8_t remainder = (hue % 43) * 6;
     const uint8_t rising = (value * remainder) / 255;
     const uint8_t falling = value - rising;
+    rgb_pixel_t full;
     switch (region) {
-        case 0: return {value, rising, 0};
-        case 1: return {falling, value, 0};
-        case 2: return {0, value, rising};
-        case 3: return {0, falling, value};
-        case 4: return {rising, 0, value};
-        default: return {value, 0, falling};
+        case 0: full = {value, rising, 0}; break;
+        case 1: full = {falling, value, 0}; break;
+        case 2: full = {0, value, rising}; break;
+        case 3: full = {0, falling, value}; break;
+        case 4: full = {rising, 0, value}; break;
+        default: full = {value, 0, falling}; break;
     }
+    const auto apply = [value, saturation](uint8_t channel) {
+        return uint8_t(value - (unsigned(value - channel) * saturation) / 255);
+    };
+    return {apply(full.r), apply(full.g), apply(full.b)};
 }
 
 static uint8_t fade(uint8_t current, uint8_t ambient) {
@@ -42,7 +47,7 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     std::fill_n(background, PIXEL_COUNT, ambient);
     for (size_t i = 0; players != nullptr && i < count; ++i) {
         const auto &player = players[i];
-        const auto tint = playerColor(player.hue, 5);
+        const auto tint = playerColor(player.hue, player.saturation, 5);
         for (unsigned cell = 0; cell < PIXEL_COUNT; ++cell) {
             const auto physical = matrixPixelIndex(cell % MATRIX_WIDTH, cell / MATRIX_WIDTH);
             const unsigned bit = 1u << (cell % 8);
@@ -55,7 +60,7 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
         const auto index = matrixPixelIndex(uint8_t(int(player.x + 0.5f) % MATRIX_WIDTH),
                                             uint8_t(int(player.y + 0.5f) % MATRIX_HEIGHT));
         occupied[index] = true;
-        const auto color = playerColor(player.hue, player.brightness);
+        const auto color = playerColor(player.hue, player.saturation, player.brightness);
         heads[index].r = add(heads[index].r, color.r);
         heads[index].g = add(heads[index].g, color.g);
         heads[index].b = add(heads[index].b, color.b);

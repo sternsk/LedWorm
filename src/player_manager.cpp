@@ -22,7 +22,7 @@ constexpr float AUTO_DECELERATION = 6.0f;
 constexpr float AUTO_CRUISE_SPEED = 2.0f;
 constexpr float AUTO_TURN_RATE = 3.0f; // radians / second.
 
-static void movePlayer(player_t &player, uint64_t now) {
+static bool movePlayer(player_t &player, uint64_t now) {
     const bool reset_clock = !player.input_clock_started || now < player.last_frame;
     const float dt = reset_clock ? 0.0f :
         std::fmin(float(now - player.last_frame) / 1000000.0f, 0.1f);
@@ -103,6 +103,7 @@ static void movePlayer(player_t &player, uint64_t now) {
             (player.worm.y_position >= MATRIX_HEIGHT - 1 && player.velocity_y > 0)) player.velocity_y = 0;
     }
     player.last_frame = now;
+    return automatic;
 }
 
 static bool headAt(const player_t &player, uint8_t x, uint8_t y) {
@@ -211,6 +212,8 @@ bool addPlayer(int socketFd) {
             player.socketFd = socketFd;
             player.player_id = id;
             player.score = 0;
+            player.hue = uint8_t(i * 256 / MAX_PLAYERS);
+            player.saturation = 255;
             player.last_input = player.last_frame = 0;
             player.input_pending = player.input_clock_started = false;
             player.force_automatic = false;
@@ -285,16 +288,24 @@ size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
                           vitamin_frame_t *vitamin_snapshot) {
     if (frames == nullptr || playerMutex == nullptr ||
         xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return 0;
-    size_t count = 0;
+    size_t count = 0, active_count = 0;
+    for (const auto &player : players) active_count += player.active;
     for (size_t i = 0; i < MAX_PLAYERS; ++i) {
         auto &player = players[i];
         if (!player.active) continue;
-        movePlayer(player, now);
+        const uint32_t steps_before = player.worm.movementSteps();
+        const bool automatic = movePlayer(player, now);
+        const uint32_t steps = player.worm.movementSteps() - steps_before;
+        if (active_count == 1 && automatic && steps > 0) {
+            player.hue = uint8_t(player.hue + uint8_t(steps * 8));
+            player.saturation = uint8_t(player.saturation + uint8_t(steps));
+        }
         if (count < capacity) {
             frames[count++] = {player.player_id, player.worm.x_position,
-                player.worm.y_position, uint8_t(i * 256 / MAX_PLAYERS),
+                player.worm.y_position, player.hue,
                 player.worm.brightness};
             auto &frame = frames[count - 1];
+            frame.saturation = player.saturation;
             frame.body_count = player.worm.bodyCount();
             memcpy(frame.area, player.worm.claimedArea(), sizeof(frame.area));
             memcpy(frame.cut, player.worm.cutCells(), sizeof(frame.cut));

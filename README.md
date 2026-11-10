@@ -41,6 +41,13 @@ Eine Schleife, die ganz um die Matrix läuft und keine eindeutige Innenfläche
 hat, verkürzt den Wurm ohne Flächenfärbung. Kollisionen mit anderen Würmern
 sind noch nicht implementiert.
 
+Bewegt sich der einzige aktive Wurm automatisch in eine neue LED-Zelle, steigt
+sein Hue-Wert um 8 und seine Sättigung um 1. Beide Werte sind 8-Bit-Werte und
+laufen nach 255 wieder bei 0 weiter. Durchläuft ein Frame mehrere Zellen, wird
+die Änderung für jede Zelle angewendet. Bei manueller Steuerung oder mehreren
+aktiven Würmern bleibt die aktuelle Farbe unverändert. Die Sättigung wird bei
+der HSV-zu-RGB-Umrechnung auch auf Körper und beanspruchte Fläche angewendet.
+
 Spieler werden beim WebSocket-Handshake automatisch angelegt. Die Oberfläche
 zeigt die zugewiesene Spieler-ID, Spielerzahl und alle 200 ms den eigenen
 Serverzustand: Punktezahl, Länge und Helligkeit (0–255 sowie Prozent).

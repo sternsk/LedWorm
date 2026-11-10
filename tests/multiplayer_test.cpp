@@ -165,6 +165,11 @@ static void rendering() {
     first.render(pair, 2, {0, 0, 0});
     assert(first.pixels()[matrixPixelIndex(2, 4)].r == 63);
     assert(first.pixels()[matrixPixelIndex(6, 4)].g == 63);
+    player_frame_t desaturated = {1, 8, 8, 86, 40};
+    desaturated.saturation = 0;
+    first.render(&desaturated, 1, {0, 0, 0});
+    const auto gray = first.pixels()[matrixPixelIndex(8, 8)];
+    assert(gray.r == 40 && gray.g == 40 && gray.b == 40);
     assert(first.pixels()[matrixPixelIndex(0, 0)].r == 0);
     // Köpfe auf derselben LED werden unabhängig von der Reihenfolge gemischt.
     pair[1].x = pair[0].x;
@@ -559,6 +564,41 @@ static void continuousAutopilot() {
     removePlayer(501);
 }
 
+static void automaticColorAnimation() {
+    player_frame_t frames[MAX_PLAYERS];
+    resetPlayersForTest();
+    assert(addPlayer(601));
+    updatePlayerFrames(0, frames, MAX_PLAYERS);
+    assert(frames[0].hue == 0 && frames[0].saturation == 255);
+    uint8_t previous_cell = uint8_t(int(frames[0].y + 0.5f) * MATRIX_WIDTH +
+                                    int(frames[0].x + 0.5f));
+    unsigned cell_steps = 0;
+    uint64_t now = 3000000;
+    while (cell_steps < 2) {
+        updatePlayerFrames(now, frames, MAX_PLAYERS);
+        const uint8_t cell = uint8_t(int(frames[0].y + 0.5f) * MATRIX_WIDTH +
+                                     int(frames[0].x + 0.5f));
+        if (cell != previous_cell) {
+            ++cell_steps;
+            assert(frames[0].hue == uint8_t(cell_steps * 8));
+            assert(frames[0].saturation == uint8_t(255 + cell_steps));
+            previous_cell = cell;
+        }
+        now += 20000;
+        assert(now < 6000000);
+    }
+    // With two automatic worms, neither color animation advances.
+    assert(addPlayer(602));
+    const uint8_t first_hue = frames[0].hue, first_saturation = frames[0].saturation;
+    updatePlayerFrames(now + 4000000, frames, MAX_PLAYERS);
+    for (unsigned i = 0; i < 100; ++i) {
+        now += 20000;
+        updatePlayerFrames(now + 4000000, frames, MAX_PLAYERS);
+    }
+    assert(frames[0].hue == first_hue && frames[0].saturation == first_saturation);
+    assert(frames[1].hue == 32 && frames[1].saturation == 255);
+}
+
 static void boundedMovement() {
     LedWorm worm;
     worm.init(1); worm.nominal_speed = 50;
@@ -595,4 +635,5 @@ int main() {
     resetPlayersForTest();
     boundedMovement(); puts("PASS: automatic edge bounds and manual wraparound");
     continuousAutopilot(); puts("PASS: continuous automatic movement over multiple vitamin cycles");
+    automaticColorAnimation(); puts("PASS: solo automatic hue and saturation animation per LED step");
 }

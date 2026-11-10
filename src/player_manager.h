@@ -12,6 +12,8 @@ struct player_t {
     bool active = false;
     LedWorm worm;
     uint32_t score = 0;
+    uint8_t hue = 0;
+    uint8_t saturation = 255;
     uint64_t last_input = 0;
     uint64_t last_frame = 0;
     bool input_pending = false;
@@ -28,6 +30,7 @@ struct player_frame_t {
     float y;
     uint8_t hue;
     uint8_t brightness = 63;
+    uint8_t saturation = 255;
     uint8_t body_count = 0;
     // Logical LED cells (y * MATRIX_WIDTH + x), newest first, including head.
     uint8_t body[LedWorm::MAX_LENGTH] = {};
