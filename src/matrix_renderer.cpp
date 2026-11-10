@@ -157,7 +157,7 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
                 for (unsigned row = 0; row < 7; ++row) {
                     if (!(bits & (1u << row))) continue;
                     const uint8_t y = uint8_t((MATRIX_HEIGHT - 7) / 2 + 6 - row);
-                    output_buffer[matrixPixelIndex(uint8_t(x), y)] = {96, 96, 96};
+                    output_buffer[matrixPixelIndex(uint8_t(x), y)] = {12, 12, 12};
                 }
             }
         }

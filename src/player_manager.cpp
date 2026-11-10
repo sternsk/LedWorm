@@ -14,7 +14,7 @@ static uint64_t vitamin_since = 0;
 static bool vitamin_clock_started = false;
 static bool waiting_for_first_vitamin = true;
 static std::minstd_rand vitamin_random{1};
-static char marquee_text[MARQUEE_TEXT_MAX + 1] = {};
+static char marquee_text[MARQUEE_TEXT_MAX + 1] = "L e d w o r m";
 static uint32_t marquee_version = 0;
 static uint32_t marquee_rendered_version = 0;
 static uint64_t marquee_started = 0;
