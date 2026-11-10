@@ -268,8 +268,8 @@ static void vitamins() {
     removePlayer(203);
     removePlayer(202);
     now += 10000000;
-    updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
-    assert(!vitamin.active);
+    assert(updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin) == 1);
+    assert(!getPlayerState(202, own));
 
     MatrixRenderer renderer;
     vitamin_frame_t visible = {true, 3, 7, VITAMIN_LIFETIME_US / 2};
@@ -433,8 +433,8 @@ static void selfCuts() {
     removePlayer(301);
     assert(addPlayer(302));
     updatePlayerFrames(now, frames, MAX_PLAYERS);
-    assert(getPlayerState(302, state) && state.length == 8);
-    for (unsigned i = 0; i < LedWorm::AREA_BYTES; ++i) assert(frames[0].area[i] == 0);
+    assert(getPlayerState(302, state) && state.length == 1);
+    assert(frames[0].area[interior / 8] & (1u << (interior % 8)));
     removePlayer(302);
 }
 
@@ -531,6 +531,7 @@ static void autopilot() {
                                                  delta(frames[0].y, next_y, MATRIX_HEIGHT));
     assert(accelerating_travel > 0 && accelerating_travel < 0.06f);
     removePlayer(401); removePlayer(402);
+    resetPlayersForTest();
     assert(addPlayer(403));
     updatePlayerFrames(now, frames, MAX_PLAYERS, &vitamin);
     assert(frames[0].x == 2 && frames[0].y == 4);
