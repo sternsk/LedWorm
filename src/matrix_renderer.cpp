@@ -100,10 +100,65 @@ static void drawClockHand(rgb_pixel_t *buffer, int x1, int y1, rgb_pixel_t color
     }
 }
 
+static uint8_t scaled(uint8_t value, float amount) {
+    return uint8_t(std::lround(value * std::max(0.0f, std::min(1.0f, amount))));
+}
+
+static void renderAlarm(rgb_pixel_t *buffer, int32_t elapsed_seconds) {
+    std::fill_n(buffer, PIXEL_COUNT, rgb_pixel_t{0, 0, 0});
+    if (elapsed_seconds < 0) return;
+    const float elapsed = std::min(float(elapsed_seconds), 600.0f);
+    const float sky = std::max(0.0f, (elapsed - 300.0f) / 300.0f);
+    const float ground = std::max(0.0f, (elapsed - 360.0f) / 240.0f);
+    for (int y = 0; y < MATRIX_HEIGHT; ++y) {
+        const float height = float(y) / float(MATRIX_HEIGHT - 1);
+        rgb_pixel_t target;
+        if (height >= 0.5f) {
+            const float upper = (height - 0.5f) * 2.0f;
+            target = {uint8_t(std::lround(54.0f * (1.0f - upper))),
+                      uint8_t(std::lround(42.0f - 18.0f * upper)),
+                      uint8_t(std::lround(6.0f + 62.0f * upper))};
+        } else {
+            const float lower = height * 2.0f;
+            target = {uint8_t(std::lround(38.0f + 42.0f * lower)),
+                      uint8_t(std::lround(12.0f + 38.0f * lower)),
+                      uint8_t(std::lround(2.0f + 3.0f * lower))};
+        }
+        // Blue descends from the top; the warm horizon follows from the bottom.
+        const float sky_amount = std::max(0.0f, std::min(1.0f,
+            sky * MATRIX_HEIGHT - float(MATRIX_HEIGHT - 1 - y)));
+        const float ground_amount = std::max(0.0f, std::min(1.0f,
+            ground * MATRIX_HEIGHT - float(y)));
+        const float amount = std::max(sky_amount, ground_amount);
+        for (int x = 0; x < MATRIX_WIDTH; ++x) {
+            buffer[matrixPixelIndex(uint8_t(x), uint8_t(y))] =
+                {scaled(target.r, amount), scaled(target.g, amount), scaled(target.b, amount)};
+        }
+    }
+    const float progress = elapsed / 600.0f;
+    const float center_x = 3.0f + progress;
+    const float center_y = 1.0f + progress * 6.0f;
+    const float radius = 0.5f + progress * 3.0f;
+    const float sun_amount = progress;
+    for (int y = 0; y < MATRIX_HEIGHT; ++y) {
+        for (int x = 0; x < MATRIX_WIDTH; ++x) {
+            const float distance = std::hypot(float(x) - center_x, float(y) - center_y);
+            const float edge = std::max(0.0f, std::min(1.0f, radius + 0.75f - distance));
+            if (edge <= 0) continue;
+            const float amount = sun_amount * edge;
+            auto &pixel = buffer[matrixPixelIndex(uint8_t(x), uint8_t(y))];
+            pixel = {uint8_t(std::lround(pixel.r + (112.0f - pixel.r) * amount)),
+                     uint8_t(std::lround(pixel.g * (1.0f - amount))),
+                     uint8_t(std::lround(pixel.b * (1.0f - amount)))};
+        }
+    }
+}
+
 void MatrixRenderer::render(const player_frame_t *players, size_t count,
                             rgb_pixel_t ambient, const vitamin_frame_t *vitamin,
                             const marquee_frame_t *marquee,
-                            const clock_frame_t *clock) {
+                            const clock_frame_t *clock,
+                            const alarm_frame_t *alarm) {
     rgb_pixel_t heads[PIXEL_COUNT] = {};
     bool occupied[PIXEL_COUNT] = {};
     rgb_pixel_t background[PIXEL_COUNT];
@@ -208,5 +263,9 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
         drawClockHand(output_buffer, minute.first, minute.second, {12, 12, 12});
         drawClockHand(output_buffer, second.first, second.second, {12, 12, 12});
         drawClockPixel(output_buffer, 8, 8, {12, 12, 12});
+    }
+    if (alarm && alarm->active) {
+        renderAlarm(frame_buffer, alarm->elapsed_seconds);
+        std::copy_n(frame_buffer, PIXEL_COUNT, output_buffer);
     }
 }

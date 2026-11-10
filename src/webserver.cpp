@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <cstdlib>
+#include <cmath>
 #include "esp_log.h"
 #include "cJSON.h" // JSON Parsing
 
@@ -57,15 +58,18 @@ static esp_err_t send_player_state(httpd_req_t *req) {
     if (!getPlayerState(httpd_req_to_sockfd(req), state)) return ESP_FAIL;
     wifi_mode_t mode;
     const bool can_reset_wifi = esp_wifi_get_mode(&mode) == ESP_OK && mode == WIFI_MODE_STA;
-    char json[320];
+    char json[400];
     int length = snprintf(json, sizeof(json),
         "{\"type\":\"player_state\",\"id\":%lu,\"x\":%.3f,\"y\":%.3f,"
         "\"length\":%u,\"brightness\":%u,\"count\":%u,\"score\":%lu,"
-        "\"can_reset_wifi\":%s,\"clock_enabled\":%s}",
+        "\"can_reset_wifi\":%s,\"clock_enabled\":%s,"
+        "\"alarm_enabled\":%s,\"alarm_hour\":%u,\"alarm_minute\":%u}",
         static_cast<unsigned long>(state.player_id), state.x, state.y,
         unsigned(state.length), unsigned(state.brightness), unsigned(state.active_players),
         static_cast<unsigned long>(state.score),
-        can_reset_wifi ? "true" : "false", state.clock_enabled ? "true" : "false");
+        can_reset_wifi ? "true" : "false", state.clock_enabled ? "true" : "false",
+        state.alarm_enabled ? "true" : "false", unsigned(state.alarm_hour),
+        unsigned(state.alarm_minute));
     if (length < 0 || size_t(length) >= sizeof(json)) return ESP_FAIL;
     httpd_ws_frame_t frame = {};
     frame.type = HTTPD_WS_TYPE_TEXT;
@@ -181,6 +185,19 @@ static esp_err_t ws_handler(httpd_req_t *req) {
                 const cJSON *enabled = cJSON_GetObjectItemCaseSensitive(root, "enabled");
                 if (!cJSON_IsBool(enabled) || !setClockEnabled(cJSON_IsTrue(enabled))) {
                     ESP_LOGW(TAG, "Ungueltiger Uhrmodus von fd=%d", client_fd);
+                }
+            } else if (cJSON_IsString(type) && strcmp(type->valuestring, "alarm") == 0) {
+                const cJSON *enabled = cJSON_GetObjectItemCaseSensitive(root, "enabled");
+                const cJSON *hour = cJSON_GetObjectItemCaseSensitive(root, "hour");
+                const cJSON *minute = cJSON_GetObjectItemCaseSensitive(root, "minute");
+                const bool valid = cJSON_IsBool(enabled) && cJSON_IsNumber(hour) &&
+                    cJSON_IsNumber(minute) && hour->valuedouble >= 0 && hour->valuedouble <= 23 &&
+                    minute->valuedouble >= 0 && minute->valuedouble <= 59 &&
+                    std::floor(hour->valuedouble) == hour->valuedouble &&
+                    std::floor(minute->valuedouble) == minute->valuedouble;
+                if (!valid || !setAlarm(cJSON_IsTrue(enabled), uint8_t(hour->valueint),
+                                        uint8_t(minute->valueint))) {
+                    ESP_LOGW(TAG, "Ungueltige Weckzeit von fd=%d", client_fd);
                 }
             }
             cJSON_Delete(root);

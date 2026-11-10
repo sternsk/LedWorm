@@ -18,6 +18,7 @@
         .join-box { background: #333; padding: 15px; border-radius: 8px; margin: 20px 0; }
         .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
         input[type="text"] { flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #555; background: #444; color: #fff; font-size: 16px; }
+        input[type="time"] { padding: 8px; border-radius: 4px; border: 1px solid #555; background: #444; color: #fff; font-size: 16px; color-scheme: dark; }
         input[type="text"]:focus { border-color: #00ffff; outline: none; }
         
         button { background: #00ffff; color: #222; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
@@ -164,14 +165,23 @@
                 <input type="checkbox" id="clock-enabled" disabled>
                 Uhrzeit anzeigen
             </label>
+            <div style="display:flex; align-items:center; justify-content:center; gap:12px; margin-top:16px;">
+                <label for="alarm-time">Weckzeit:</label>
+                <input type="time" id="alarm-time" value="07:00" disabled>
+                <label style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" id="alarm-enabled" disabled>
+                    Wecker
+                </label>
+            </div>
+            <p id="alarm-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="container status-box" id="wifi-reset-section" hidden>
+            <button type="button" id="wifi-reset" disabled>WLAN zurücksetzen</button>
+            <p id="wifi-action-description">Entfernt die gespeicherten WLAN-Zugangsdaten und startet LedWorm neu.</p>
+            <p id="wifi-reset-status" role="status" aria-live="polite"></p>
         </div>
     </div>
 
-    <div class="container status-box" id="wifi-reset-section" hidden>
-        <button type="button" id="wifi-reset" disabled>WLAN zurücksetzen</button>
-        <p id="wifi-action-description">Entfernt die gespeicherten WLAN-Zugangsdaten und startet LedWorm neu.</p>
-        <p id="wifi-reset-status" role="status" aria-live="polite"></p>
-    </div>
 
     <div class="bottom-controls">
         <div id="joystick-zone">
@@ -252,6 +262,32 @@
         const marqueeSend = document.getElementById('marquee-send');
         const marqueeStatus = document.getElementById('marquee-status');
         const clockEnabled = document.getElementById('clock-enabled');
+        const alarmTime = document.getElementById('alarm-time');
+        const alarmEnabled = document.getElementById('alarm-enabled');
+        const alarmStatus = document.getElementById('alarm-status');
+
+        function sendAlarm() {
+            const match = /^(\d{2}):(\d{2})$/.exec(alarmTime.value);
+            if (!match) {
+                alarmStatus.textContent = 'Bitte eine gültige Weckzeit wählen.';
+                alarmEnabled.checked = false;
+                return;
+            }
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alarmStatus.textContent = 'Keine Verbindung zu LedWorm.';
+                return;
+            }
+            ws.send(JSON.stringify({type:'alarm', enabled:alarmEnabled.checked,
+                hour:Number(match[1]), minute:Number(match[2])}));
+            alarmStatus.textContent = alarmEnabled.checked
+                ? `Wecker für ${alarmTime.value} aktiviert. Die Matrix bleibt bis dahin dunkel.`
+                : 'Wecker ausgeschaltet.';
+        }
+
+        alarmEnabled.addEventListener('change', sendAlarm);
+        alarmTime.addEventListener('change', () => {
+            if (alarmEnabled.checked) sendAlarm();
+        });
 
         clockEnabled.addEventListener('change', () => {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -297,6 +333,8 @@
                 connectionState.textContent = 'Verbunden';
                 marqueeSend.disabled = false;
                 clockEnabled.disabled = false;
+                alarmTime.disabled = false;
+                alarmEnabled.disabled = false;
                 const requestState = () => {
                     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'state'}));
                 };
@@ -322,6 +360,10 @@
                 wormLength.textContent = data.length;
                 wormBrightness.textContent = `${data.brightness} (${Math.round(data.brightness / 255 * 100)} %)`;
                 clockEnabled.checked = data.clock_enabled === true;
+                alarmEnabled.checked = data.alarm_enabled === true;
+                if (Number.isInteger(data.alarm_hour) && Number.isInteger(data.alarm_minute)) {
+                    alarmTime.value = `${String(data.alarm_hour).padStart(2,'0')}:${String(data.alarm_minute).padStart(2,'0')}`;
+                }
                 valueSlider.disabled = false;
                 if (!adjustingBrightness) {
                     valueSlider.value = data.brightness;
@@ -344,6 +386,8 @@
                 valueSlider.disabled = true;
                 marqueeSend.disabled = true;
                 clockEnabled.disabled = true;
+                alarmTime.disabled = true;
+                alarmEnabled.disabled = true;
                 if (wifiResetComplete) {
                     connectionState.textContent = 'WLAN zurückgesetzt';
                 } else {

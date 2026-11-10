@@ -94,6 +94,26 @@ automatisch gesteuerter Wurm bleibt während der anfänglichen `L e d w o r m`-
 Animation sichtbar. Bei einer später aktivierten Uhr oder einem eingegebenen
 Lauftext wird er ausgeblendet; ohne diese Anzeigen ist er wieder sichtbar.
 
+## Wecker
+
+Das Controller-GUI bietet eine lokale Weckzeit und die Checkbox **Wecker** an.
+Die WebSocket-Nachricht `{"type":"alarm","enabled":true,"hour":7,"minute":0}`
+aktiviert ihn global. Bei Aktivierung übernimmt der Wecker die Matrix und stellt
+sie bis zur nächsten eingestellten Uhrzeit vollständig dunkel. Wird er innerhalb
+der gewählten Minute eingeschaltet, beginnt die Animation sofort; liegt diese
+Minute bereits zurück, gilt die Uhrzeit des folgenden Tages. Eine geänderte
+Weckzeit startet diese Planung neu. Ohne gültig synchronisierte Internetzeit
+bleibt die Matrix dunkel.
+
+Zur Weckzeit steigt unten links allmählich ein roter Kreis auf. Nach fünf Minuten
+ist er halb sichtbar und der blaue Himmel beginnt sich von oben auszubreiten.
+Ab der sechsten Minute folgt von unten verzögert ein gelb-orange-brauner Bereich.
+Nach zehn Minuten steht der vollständig sichtbare Kreis in der Mitte des linken
+Matrixbereichs vor einem Verlauf von Blau oben zu Gelb, Orange und Braun unten.
+Dieses Endbild bleibt sichtbar, bis die Checkbox ausgeschaltet oder die Weckzeit
+bei aktivem Wecker geändert wird. Während des Weckermodus werden Würmer,
+Vitamine, Lauftext und analoge Uhr vollständig überdeckt.
+
 ## Vitamine und Punkte
 
 Nach drei Sekunden ohne gültige Joysticknachricht steuert der Wurm automatisch

@@ -40,6 +40,13 @@ assert.equal(a.nodes['worm-length'].textContent, 8);
 assert.equal(a.nodes['value-slider'].disabled, false);
 assert.equal(a.nodes['marquee-send'].disabled, false);
 assert.equal(a.nodes['clock-enabled'].disabled, false);
+assert.equal(a.nodes['alarm-enabled'].disabled, false);
+assert.equal(a.nodes['alarm-time'].disabled, false);
+a.nodes['alarm-time'].value = '06:45';
+a.nodes['alarm-enabled'].checked = true;
+a.nodes['alarm-enabled'].listeners.change();
+assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
+    {type:'alarm',enabled:true,hour:6,minute:45});
 a.nodes['clock-enabled'].checked = true;
 a.nodes['clock-enabled'].listeners.change();
 assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
@@ -66,13 +73,16 @@ assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))), {type:'value'
 assert.equal(a.nodes['brightness-preview'].textContent, 0);
 // Confirmed brightness only changes when the server acknowledges it.
 assert.equal(a.nodes['worm-brightness'].textContent, '63 (25 %)');
-a.receive({id:1,score:1,length:9,brightness:0,count:2,clock_enabled:true});
+a.receive({id:1,score:1,length:9,brightness:0,count:2,clock_enabled:true,
+    alarm_enabled:true,alarm_hour:8,alarm_minute:5});
 assert.equal(a.nodes['worm-length'].textContent, 9);
 assert.equal(b.nodes['worm-length'].textContent, 8);
 assert.equal(a.nodes['worm-score'].textContent, 1);
 assert.equal(b.nodes['worm-score'].textContent, 7);
 assert.equal(a.nodes['worm-brightness'].textContent, '0 (0 %)');
 assert.equal(a.nodes['clock-enabled'].checked, true);
+assert.equal(a.nodes['alarm-enabled'].checked, true);
+assert.equal(a.nodes['alarm-time'].value, '08:05');
 assert.equal(b.nodes['worm-brightness'].textContent, '200 (78 %)');
 assert.equal(b.socket.sent.length, 1);
 a.socket.onmessage({data:'invalid json'});
@@ -83,6 +93,8 @@ assert.equal(a.intervals.size, 0);
 assert.equal(a.nodes['value-slider'].disabled, true);
 assert.equal(a.nodes['marquee-send'].disabled, true);
 assert.equal(a.nodes['clock-enabled'].disabled, true);
+assert.equal(a.nodes['alarm-enabled'].disabled, true);
+assert.equal(a.nodes['alarm-time'].disabled, true);
 assert.equal(a.nodes['worm-score'].textContent, '–');
 assert.equal(a.nodes['worm-brightness'].textContent, '–');
 const sentBefore = a.socket.sent.length;

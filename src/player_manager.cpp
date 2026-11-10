@@ -20,6 +20,10 @@ static uint32_t marquee_version = 0;
 static uint32_t marquee_rendered_version = 0;
 static uint64_t marquee_started = 0;
 static bool clock_enabled = false;
+static bool alarm_enabled = false;
+static uint8_t alarm_hour = 7;
+static uint8_t alarm_minute = 0;
+static time_t alarm_target = 0;
 constexpr uint64_t FIRST_VITAMIN_DELAY = 5000000;
 constexpr uint64_t VITAMIN_DELAY = 3000000;
 constexpr uint64_t AUTOPILOT_DELAY = 3000000;
@@ -273,6 +277,10 @@ void resetPlayersForTest() {
     marquee_version = marquee_rendered_version = 0;
     marquee_started = 0;
     clock_enabled = false;
+    alarm_enabled = false;
+    alarm_hour = 7;
+    alarm_minute = 0;
+    alarm_target = 0;
     xSemaphoreGive(playerMutex);
 }
 #endif
@@ -376,6 +384,49 @@ void updateClockFrame(clock_frame_t &frame) {
     frame.second = uint8_t(local.tm_sec);
 }
 
+bool setAlarm(bool enabled, uint8_t hour, uint8_t minute) {
+    if (hour > 23 || minute > 59 || playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
+    alarm_enabled = enabled;
+    alarm_hour = hour;
+    alarm_minute = minute;
+    alarm_target = 0;
+    xSemaphoreGive(playerMutex);
+    return true;
+}
+
+void updateAlarmFrame(alarm_frame_t &frame) {
+    frame = {};
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    if (!alarm_enabled) {
+        xSemaphoreGive(playerMutex);
+        return;
+    }
+    frame.active = true; // An enabled alarm owns the matrix, even before valid network time.
+    const time_t now = time(nullptr);
+    if (now >= 1704067200 && alarm_target == 0) {
+        struct tm local = {};
+        if (localtime_r(&now, &local)) {
+            local.tm_hour = alarm_hour;
+            local.tm_min = alarm_minute;
+            local.tm_sec = 0;
+            local.tm_isdst = -1;
+            alarm_target = mktime(&local);
+            // Activating during the selected minute starts immediately; otherwise use tomorrow.
+            if (alarm_target != time_t(-1) && alarm_target + 60 <= now) {
+                local.tm_mday += 1;
+                alarm_target = mktime(&local);
+            }
+        }
+    }
+    if (alarm_target > 0 && now >= alarm_target) {
+        const time_t elapsed = now - alarm_target;
+        frame.elapsed_seconds = int32_t(elapsed > 600 ? 600 : elapsed);
+    }
+    xSemaphoreGive(playerMutex);
+}
+
 void updateMarqueeFrame(uint64_t now, marquee_frame_t &frame) {
     frame = {};
     if (playerMutex == nullptr ||
@@ -425,7 +476,7 @@ bool getPlayerState(int socketFd, player_state_t &state) {
     }
     if (own) state = {own->player_id, own->worm.x_position, own->worm.y_position,
                      own->worm.length, own->worm.brightness, count, own->score,
-                     clock_enabled};
+                     clock_enabled, alarm_enabled, alarm_hour, alarm_minute};
     xSemaphoreGive(playerMutex);
     return own != nullptr;
 }

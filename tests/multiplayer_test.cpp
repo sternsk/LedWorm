@@ -381,6 +381,42 @@ static void vitamins() {
     assert(soft.pixels()[index].r == 8 && soft.pixels()[index].b == 24);
 }
 
+static void alarmRendering() {
+    alarm_frame_t alarm = {true, -1};
+    player_frame_t worm = {1, 8, 8, 0, 255};
+    MatrixRenderer renderer;
+    renderer.render(&worm, 1, {50, 50, 50}, nullptr, nullptr, nullptr, &alarm);
+    for (unsigned i = 0; i < PIXEL_COUNT; ++i) {
+        const auto pixel = renderer.pixels()[i];
+        assert(pixel.r == 0 && pixel.g == 0 && pixel.b == 0);
+    }
+
+    alarm.elapsed_seconds = 300;
+    renderer.render(&worm, 1, {50, 50, 50}, nullptr, nullptr, nullptr, &alarm);
+    const auto half_sun = renderer.pixels()[matrixPixelIndex(4, 4)];
+    const auto top_at_five = renderer.pixels()[matrixPixelIndex(8, 15)];
+    assert(half_sun.r > 0 && half_sun.r < 112);
+    assert(top_at_five.r == 0 && top_at_five.g == 0 && top_at_five.b == 0);
+
+    alarm.elapsed_seconds = 600;
+    renderer.render(&worm, 1, {50, 50, 50}, nullptr, nullptr, nullptr, &alarm);
+    const auto top = renderer.pixels()[matrixPixelIndex(12, 15)];
+    const auto bottom = renderer.pixels()[matrixPixelIndex(12, 0)];
+    const auto sun = renderer.pixels()[matrixPixelIndex(4, 7)];
+    assert(top.b > top.r && top.b > top.g);
+    assert(bottom.r > bottom.g && bottom.g > bottom.b);
+    assert(sun.r > sun.g && sun.r > sun.b);
+
+    resetPlayersForTest();
+    assert(addPlayer(901));
+    assert(setAlarm(true, 6, 30));
+    player_state_t state;
+    assert(getPlayerState(901, state));
+    assert(state.alarm_enabled && state.alarm_hour == 6 && state.alarm_minute == 30);
+    assert(setAlarm(false, 6, 30));
+    assert(getPlayerState(901, state) && !state.alarm_enabled);
+}
+
 static void bodies() {
     LedWorm worm;
     assert(worm.init(1));
@@ -701,6 +737,7 @@ int main() {
     resetPlayersForTest();
     rendering(); puts("PASS: Matrixmapping, mehrere Köpfe, Mischung und Fade");
     marquee(); puts("PASS: marquee validation, timing, centered 5x7 rendering and clearing");
+    alarmRendering(); puts("PASS: alarm darkness, five-minute sun and final sunrise gradient");
     resetPlayersForTest();
     vitamins(); puts("PASS: vitamin timing, free spawn, pickup, per-player score, reconnect, overlay");
     resetPlayersForTest();
