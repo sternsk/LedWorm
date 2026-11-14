@@ -162,12 +162,17 @@ static void rendering() {
     assert(matrixPixelIndex(0, 15, true) == 0);
     assert(matrixPixelIndex(1, 0, true) == 16);
     assert(matrixPixelIndex(1, 15, true) == 31);
-    // Physische Spalte 16 fehlt: LED 255 und 256 liegen beide am oberen Rand;
-    // die leere Spalte darf das Bild rechts der Luecke nicht spiegeln.
-    assert(matrixPixelIndex(15, 0, true) == 240);
-    assert(matrixPixelIndex(15, 15, true) == 255);
-    assert(matrixPixelIndex(16, 15, true) == 256);
-    assert(matrixPixelIndex(17, 0, true) == 272);
+    // Die physische Spalte 15 (LEDs 240..255) ist verdeckt und wird uebersprungen.
+    assert(matrixPixelIndex(14, 15, true) == 224);
+    assert(matrixPixelIndex(14, 0, true) == 239);
+    assert(matrixPixelIndex(15, 15, true) == 256);
+    assert(matrixPixelIndex(15, 0, true) == 271);
+    assert(matrixPixelIndex(16, 0, true) == 272);
+    MatrixRenderer gap;
+    gap.render(nullptr, 0, {20, 30, 40});
+    for (size_t i = 240; i < 256; ++i) {
+        assert(gap.pixels()[i].r == 0 && gap.pixels()[i].g == 0 && gap.pixels()[i].b == 0);
+    }
     MatrixRenderer first, reversed;
     player_frame_t pair[] = {{1, 2, 4, 0}, {2, 6, 4, 86}};
     first.render(pair, 2, {0, 0, 0});
@@ -466,7 +471,7 @@ static void bodies() {
         worm.move(vertical ? 0 : (row % 2 ? -1 : 1), vertical ? 1 : 0, now);
     }
     assert(worm.bodyCount() == LedWorm::MAX_LENGTH);
-    bool seen[PIXEL_COUNT] = {};
+    bool seen[MATRIX_CELL_COUNT] = {};
     for (unsigned i = 0; i < worm.bodyCount(); ++i) {
         assert(!seen[worm.bodyCell(i)]);
         seen[worm.bodyCell(i)] = true;

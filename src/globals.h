@@ -6,10 +6,12 @@
 #define LED_PIN     7
 constexpr uint8_t MATRIX_WIDTH = 20;
 constexpr uint8_t MATRIX_HEIGHT = 16;
-constexpr unsigned PIXEL_COUNT = MATRIX_WIDTH * MATRIX_HEIGHT;
-constexpr uint8_t MATRIX_SKIPPED_COLUMN = 16;
-// Benachbarte physische Spalten laufen entgegengesetzt. Ueber der Luecke an
-// Position 16 findet deshalb kein Richtungswechsel statt.
+constexpr unsigned MATRIX_CELL_COUNT = MATRIX_WIDTH * MATRIX_HEIGHT;
+constexpr uint8_t MATRIX_PHYSICAL_COLUMNS = 21;
+constexpr unsigned PIXEL_COUNT = MATRIX_PHYSICAL_COLUMNS * MATRIX_HEIGHT;
+// Nullbasierter Index der verdeckten physischen 16. Spalte.
+constexpr uint8_t MATRIX_SKIPPED_COLUMN = 15;
+// Die verdeckte Spalte bleibt elektrisch Teil der LED-Kette.
 constexpr bool MATRIX_SERPENTINE = true;
 
 constexpr uint8_t MAX_PLAYERS = 8;

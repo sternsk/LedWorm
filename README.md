@@ -1,6 +1,7 @@
 # LedWorm
 
-ESP32-S3-Firmware für eine effektiv 20×16 große WS2812-Matrix und bis zu acht
+ESP32-S3-Firmware für eine physische 21×16-WS2812-Matrix mit effektiv 20×16
+sichtbaren Zellen und bis zu acht
 WebSocket-Spieler. Jeder verbundene Controller erhält einen eigenen Wurm,
 eine feste Farbe und einen verteilten Startpunkt. Der Joystick bewegt den
 Spieler auf beiden Achsen; beim Überschreiten eines Matrixrands erscheint
@@ -13,9 +14,9 @@ In `src/globals.h` sind Abmessungen, LED-Pin und Verdrahtung festgelegt:
 
 - Die LEDs laufen spaltenweise; LED 0 liegt physisch oben links, LED 1 darunter.
 - `MATRIX_SERPENTINE = true`: jede zweite physische Spalte läuft rückwärts.
-- Von 21 physischen Spalten wird Spalte 16 ausgelassen. Die leere Spalte
-  schaltet die Serpentinenphase nicht um; LED 255 und LED 256 liegen daher
-  beide am oberen Rand.
+- Die physische Spalte 16 (LED-Indizes 240 bis 255) ist verdeckt, wird nicht als
+  logische Zelle verwendet und bleibt schwarz. Die folgenden logischen Spalten
+  werden in der LED-Kette um 16 Indizes versetzt.
 - Der Ursprung `(0, 0)` ist links unten; positives Y bewegt nach oben.
   Die physische Orientierung muss entsprechend zur Verdrahtung passen.
 

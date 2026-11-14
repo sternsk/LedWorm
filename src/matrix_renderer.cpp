@@ -6,12 +6,11 @@
 #include <utility>
 
 size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
+    const uint8_t physical_column = x + (x >= MATRIX_SKIPPED_COLUMN ? 1 : 0);
     // LED 0 sitzt oben links. Logisches Y waechst weiterhin von unten nach oben.
-    // Die ausgelassene physische Spalte enthaelt keine LEDs und darf die
-    // Serpentinenphase daher nicht umschalten.
-    const bool top_to_bottom = !serpentine || (x % 2) == 0;
+    const bool top_to_bottom = !serpentine || (physical_column % 2) == 0;
     const uint8_t offset = top_to_bottom ? MATRIX_HEIGHT - 1 - y : y;
-    return size_t(x) * MATRIX_HEIGHT + offset;
+    return size_t(physical_column) * MATRIX_HEIGHT + offset;
 }
 
 static rgb_pixel_t playerColor(uint8_t hue, uint8_t saturation, uint8_t value) {
@@ -167,14 +166,21 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     bool occupied[PIXEL_COUNT] = {};
     rgb_pixel_t background[PIXEL_COUNT];
     bool clear[PIXEL_COUNT] = {};
-    std::fill_n(background, PIXEL_COUNT, ambient);
+    std::fill_n(background, PIXEL_COUNT, rgb_pixel_t{0, 0, 0});
+    // Nur logische Zellen erhalten den Hintergrund. Die verdeckte physische
+    // Spalte bleibt dadurch auch bei einer Ambient-Farbe dauerhaft schwarz.
+    for (unsigned y = 0; y < MATRIX_HEIGHT; ++y) {
+        for (unsigned x = 0; x < MATRIX_WIDTH; ++x) {
+            background[matrixPixelIndex(uint8_t(x), uint8_t(y))] = ambient;
+        }
+    }
     for (size_t i = 0; players != nullptr && i < count; ++i) {
         const auto &player = players[i];
         const bool display_overlay = (clock && clock->active) ||
             (marquee && marquee->active && !marquee->initial_animation);
         if (player.automatic && display_overlay) continue;
         const auto tint = playerColor(player.hue, player.saturation, 5);
-        for (unsigned cell = 0; cell < PIXEL_COUNT; ++cell) {
+        for (unsigned cell = 0; cell < MATRIX_CELL_COUNT; ++cell) {
             const auto physical = matrixPixelIndex(cell % MATRIX_WIDTH, cell / MATRIX_WIDTH);
             const unsigned bit = 1u << (cell % 8);
             if (player.area[cell / 8] & bit) background[physical] = tint;

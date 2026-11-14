@@ -157,9 +157,9 @@ static void updateVitamin(uint64_t now) {
         return;
     }
     if (elapsed < (waiting_for_first_vitamin ? FIRST_VITAMIN_DELAY : VITAMIN_DELAY)) return;
-    const unsigned start = vitamin_random() % PIXEL_COUNT;
-    for (unsigned offset = 0; offset < PIXEL_COUNT; ++offset) {
-        const unsigned cell = (start + offset) % PIXEL_COUNT;
+    const unsigned start = vitamin_random() % MATRIX_CELL_COUNT;
+    for (unsigned offset = 0; offset < MATRIX_CELL_COUNT; ++offset) {
+        const unsigned cell = (start + offset) % MATRIX_CELL_COUNT;
         const uint8_t x = cell % MATRIX_WIDTH, y = cell / MATRIX_WIDTH;
         bool occupied = false;
         for (const auto &player : players) {
