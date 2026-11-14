@@ -6,7 +6,7 @@
 #include "esp_log.h"
 #include "led_strip.h" 
 #define LED_PIN     7
-#define PIXEL_COUNT 256
+#define PIXEL_COUNT 336
 
 static const char *LED_TAG = "LED_TASK";
 static led_strip_handle_t led_strip;
@@ -114,7 +114,7 @@ void led_render_task(void *pvParameters) {
 
     // Lokale Statusvariablen
     bool automotion = true;
-    uint8_t currentLED = 0;
+    uint16_t currentLED = 0;
     static float exact_position = 0.0f;
     uint8_t hue = 0;
     uint8_t saturation = 0;
