@@ -6,9 +6,10 @@
 #include <utility>
 
 size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
-    const uint8_t physical_column = x + (x >= MATRIX_SKIPPED_COLUMN ? 1 : 0);
     // LED 0 sitzt oben links. Logisches Y waechst weiterhin von unten nach oben.
-    const bool top_to_bottom = !serpentine || (physical_column % 2) == 0;
+    // Die ausgelassene physische Spalte enthaelt keine LEDs und darf die
+    // Serpentinenphase daher nicht umschalten.
+    const bool top_to_bottom = !serpentine || (x % 2) == 0;
     const uint8_t offset = top_to_bottom ? MATRIX_HEIGHT - 1 - y : y;
     return size_t(x) * MATRIX_HEIGHT + offset;
 }

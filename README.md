@@ -13,8 +13,9 @@ In `src/globals.h` sind Abmessungen, LED-Pin und Verdrahtung festgelegt:
 
 - Die LEDs laufen spaltenweise; LED 0 liegt physisch oben links, LED 1 darunter.
 - `MATRIX_SERPENTINE = true`: jede zweite physische Spalte läuft rückwärts.
-- Von 21 physischen Spalten wird Spalte 16 ausgelassen. Daher gibt es zwischen
-  den logischen Spalten 15 und 16 keinen Richtungswechsel.
+- Von 21 physischen Spalten wird Spalte 16 ausgelassen. Die leere Spalte
+  schaltet die Serpentinenphase nicht um; LED 255 und LED 256 liegen daher
+  beide am oberen Rand.
 - Der Ursprung `(0, 0)` ist links unten; positives Y bewegt nach oben.
   Die physische Orientierung muss entsprechend zur Verdrahtung passen.
 

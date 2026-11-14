@@ -162,10 +162,12 @@ static void rendering() {
     assert(matrixPixelIndex(0, 15, true) == 0);
     assert(matrixPixelIndex(1, 0, true) == 16);
     assert(matrixPixelIndex(1, 15, true) == 31);
-    // Physische Spalte 16 fehlt: logisch 15 -> 16 wechselt die Richtung nicht.
+    // Physische Spalte 16 fehlt: LED 255 und 256 liegen beide am oberen Rand;
+    // die leere Spalte darf das Bild rechts der Luecke nicht spiegeln.
     assert(matrixPixelIndex(15, 0, true) == 240);
-    assert(matrixPixelIndex(16, 0, true) == 256);
-    assert(matrixPixelIndex(17, 15, true) == 272);
+    assert(matrixPixelIndex(15, 15, true) == 255);
+    assert(matrixPixelIndex(16, 15, true) == 256);
+    assert(matrixPixelIndex(17, 0, true) == 272);
     MatrixRenderer first, reversed;
     player_frame_t pair[] = {{1, 2, 4, 0}, {2, 6, 4, 86}};
     first.render(pair, 2, {0, 0, 0});
