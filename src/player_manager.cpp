@@ -216,7 +216,7 @@ bool addPlayer(int socketFd) {
                 xSemaphoreGive(playerMutex);
                 return false;
             }
-            // Acht gut verteilte Startplätze auf der 16x16-Matrix.
+            // Acht gut verteilte Startplaetze auf der Matrix.
             player.worm.x_position = float(2 + (i % 4) * 4);
             player.worm.y_position = float(4 + (i / 4) * 8);
             player.socketFd = socketFd;

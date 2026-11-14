@@ -35,7 +35,7 @@ void setupLEDs() {
     
     ESP_ERROR_CHECK(led_strip_clear(led_strip));
 
-    ESP_LOGI(LED_TAG, "LedWorm 16x16-Matrix initialisiert");
+    ESP_LOGI(LED_TAG, "LedWorm 20x16-Matrix initialisiert");
 }
 
 void led_render_task(void *) {

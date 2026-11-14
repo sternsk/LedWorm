@@ -10,16 +10,16 @@ static float wrapPosition(float position, float extent) {
     return wrapped >= extent ? 0.0f : wrapped;
 }
 
-void LedWorm::encloseArea(uint8_t cell, unsigned intersection) {
+void LedWorm::encloseArea(cell_t cell, unsigned intersection) {
     // Unwrap the loop locally so a small loop across an edge fills the small area.
     int16_t px[MAX_LENGTH + 1], py[MAX_LENGTH + 1];
     px[0] = cell % MATRIX_WIDTH;
     py[0] = cell / MATRIX_WIDTH;
     int min_x = px[0], max_x = px[0], min_y = py[0], max_y = py[0];
-    uint8_t previous = cell;
+    cell_t previous = cell;
     const unsigned vertices = intersection + 2;
     for (unsigned i = 1; i < vertices; ++i) {
-        const uint8_t next = bodyCell(i - 1);
+        const cell_t next = bodyCell(i - 1);
         int dx = int(next % MATRIX_WIDTH) - int(previous % MATRIX_WIDTH);
         int dy = int(next / MATRIX_WIDTH) - int(previous / MATRIX_WIDTH);
         if (dx > MATRIX_WIDTH / 2) dx -= MATRIX_WIDTH;
@@ -59,7 +59,7 @@ void LedWorm::encloseArea(uint8_t cell, unsigned intersection) {
 void LedWorm::rememberPosition(float x, float y) {
     const unsigned column = int(wrapPosition(x, MATRIX_WIDTH) + 0.5f) % MATRIX_WIDTH;
     const unsigned row = int(wrapPosition(y, MATRIX_HEIGHT) + 0.5f) % MATRIX_HEIGHT;
-    const uint8_t cell = row * MATRIX_WIDTH + column;
+    const cell_t cell = row * MATRIX_WIDTH + column;
     if (path_count && path[path_head] == cell) return;
     ++movement_steps;
     for (unsigned age = 1; age < bodyCount(); ++age) {

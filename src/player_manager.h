@@ -33,7 +33,7 @@ struct player_frame_t {
     uint8_t saturation = 255;
     uint8_t body_count = 0;
     // Logical LED cells (y * MATRIX_WIDTH + x), newest first, including head.
-    uint8_t body[LedWorm::MAX_LENGTH] = {};
+    LedWorm::cell_t body[LedWorm::MAX_LENGTH] = {};
     uint8_t area[LedWorm::AREA_BYTES] = {};
     uint8_t cut[LedWorm::AREA_BYTES] = {};
     bool automatic = false;

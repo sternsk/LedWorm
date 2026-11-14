@@ -143,7 +143,7 @@ static void players() {
 
 static void rendering() {
     // Nearest-LED rounding must wrap rather than address beyond the matrix.
-    for (const auto &position : {std::pair<float, float>{15.75f, 3.0f},
+    for (const auto &position : {std::pair<float, float>{MATRIX_WIDTH - 0.25f, 3.0f},
                                  {3.0f, 15.75f}, {15.75f, 15.75f}}) {
         MatrixRenderer edge;
         player_frame_t head = {1, position.first, position.second, 0, 255};
@@ -155,12 +155,17 @@ static void rendering() {
         for (size_t i = 0; i < PIXEL_COUNT; ++i) total += edge.pixels()[i].r;
         assert(total == 255);
     }
-    assert(matrixPixelIndex(0, 0, false) == 0);
-    assert(matrixPixelIndex(15, 15, false) == 255);
-    assert(matrixPixelIndex(0, 1, false) == 16);
-    assert(matrixPixelIndex(0, 1, true) == 31);
-    assert(matrixPixelIndex(15, 1, true) == 16);
-    assert(matrixPixelIndex(0, 2, true) == 32);
+    // Spaltenweise Verdrahtung: LED 0 ist oben links, danach geht es abwaerts.
+    assert(matrixPixelIndex(0, 15, false) == 0);
+    assert(matrixPixelIndex(0, 0, false) == 15);
+    assert(matrixPixelIndex(1, 15, false) == 16);
+    assert(matrixPixelIndex(0, 15, true) == 0);
+    assert(matrixPixelIndex(1, 0, true) == 16);
+    assert(matrixPixelIndex(1, 15, true) == 31);
+    // Physische Spalte 16 fehlt: logisch 15 -> 16 wechselt die Richtung nicht.
+    assert(matrixPixelIndex(15, 0, true) == 240);
+    assert(matrixPixelIndex(16, 0, true) == 256);
+    assert(matrixPixelIndex(17, 15, true) == 272);
     MatrixRenderer first, reversed;
     player_frame_t pair[] = {{1, 2, 4, 0}, {2, 6, 4, 86}};
     first.render(pair, 2, {0, 0, 0});
@@ -201,7 +206,7 @@ static void rendering() {
         assert(first.pixels()[i].g == 8);
         assert(first.pixels()[i].b == 9);
     }
-    player_frame_t invalid[] = {{1, -1, 0, 0}, {2, 16, 15, 0},
+    player_frame_t invalid[] = {{1, -1, 0, 0}, {2, MATRIX_WIDTH, 15, 0},
         {3, 0, std::numeric_limits<float>::quiet_NaN(), 0}};
     first.render(invalid, 3, {12, 8, 9});
     assert(first.pixels()[0].r == 12);
@@ -681,14 +686,14 @@ static void automaticColorAnimation() {
     assert(addPlayer(601));
     updatePlayerFrames(0, frames, MAX_PLAYERS);
     assert(frames[0].hue == 0 && frames[0].saturation == 255);
-    uint8_t previous_cell = uint8_t(int(frames[0].y + 0.5f) * MATRIX_WIDTH +
-                                    int(frames[0].x + 0.5f));
+    LedWorm::cell_t previous_cell = LedWorm::cell_t(int(frames[0].y + 0.5f) * MATRIX_WIDTH +
+                                                    int(frames[0].x + 0.5f));
     unsigned cell_steps = 0;
     uint64_t now = 3000000;
     while (cell_steps < 2) {
         updatePlayerFrames(now, frames, MAX_PLAYERS);
-        const uint8_t cell = uint8_t(int(frames[0].y + 0.5f) * MATRIX_WIDTH +
-                                     int(frames[0].x + 0.5f));
+        const LedWorm::cell_t cell = LedWorm::cell_t(int(frames[0].y + 0.5f) * MATRIX_WIDTH +
+                                                     int(frames[0].x + 0.5f));
         if (cell != previous_cell) {
             ++cell_steps;
             assert(frames[0].hue == uint8_t(cell_steps * 8));
