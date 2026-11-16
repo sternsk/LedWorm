@@ -5,8 +5,13 @@
 #include <cstring>
 
 size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
-    if (serpentine && (y % 2) != 0) x = MATRIX_WIDTH - 1 - x;
-    return size_t(y) * MATRIX_WIDTH + x;
+    // Rotate the native 8x32 panel clockwise into the logical 32x8 landscape view.
+    uint8_t physical_x = MATRIX_PHYSICAL_WIDTH - 1 - y;
+    const uint8_t physical_y = x;
+    if (serpentine && (physical_y % 2) != 0) {
+        physical_x = MATRIX_PHYSICAL_WIDTH - 1 - physical_x;
+    }
+    return size_t(physical_y) * MATRIX_PHYSICAL_WIDTH + physical_x;
 }
 
 static rgb_pixel_t playerColor(uint8_t hue, uint8_t saturation, uint8_t value) {

@@ -1,11 +1,12 @@
 #pragma once
 
 #include <stdint.h>
+#include "globals.h"
 
 class LedWorm {
 public:
     static constexpr uint8_t MAX_LENGTH = 255;
-    static constexpr unsigned AREA_BYTES = 32; // 16 x 16 logical cells.
+    static constexpr unsigned AREA_BYTES = (PIXEL_COUNT + 7) / 8;
     float joystick_x = 0.0f;
     float joystick_y = 0.0f;
     float x_position = 0.0f;

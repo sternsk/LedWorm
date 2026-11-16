@@ -2,6 +2,7 @@
 #include "webserver.h"
 #include "led_effects.h"
 #include "player_manager.h"
+#include "cyd_display.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,6 +22,7 @@ static void network_changed(bool connected) {
 
 extern "C" void app_main(void) {
     ESP_ERROR_CHECK(player_manager_init() ? ESP_OK : ESP_ERR_NO_MEM);
+    ESP_ERROR_CHECK(cyd_display_start());
     ESP_ERROR_CHECK(xTaskCreatePinnedToCore(led_render_task, "led_render_task",
                                           4096, nullptr, 5, nullptr, 1) == pdPASS
                         ? ESP_OK : ESP_ERR_NO_MEM);

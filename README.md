@@ -1,5 +1,18 @@
 # LedWorm
 
+## CYD hardware
+
+The firmware targets an ESP32-2432S028 (CYD) and a native 8-by-32 WS2812
+matrix mounted horizontally. It is exposed to the game as a 32-by-8 canvas;
+the renderer rotates logical coordinates into the panel wiring. LED data is on GPIO 27. The built-in ILI9341 display
+uses GPIO 12/13/14/15/2 and backlight GPIO 21; its XPT2046 touch controller
+uses GPIO 25/32/39/33 with IRQ on GPIO 36.
+
+The landscape touch menu changes the red, green and blue background values
+with `-`/`+` buttons and exposes Wi-Fi reset. Touch calibration endpoints are
+the `RAW_MIN` and `RAW_MAX` constants in `src/cyd_display.cpp` if a particular
+panel needs adjustment.
+
 ESP32-S3-Firmware für eine 16×16-WS2812-Matrix und bis zu acht
 WebSocket-Spieler. Jeder verbundene Controller erhält einen eigenen Wurm,
 eine feste Farbe und einen verteilten Startpunkt. Der Joystick bewegt den
