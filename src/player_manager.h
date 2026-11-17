@@ -71,6 +71,13 @@ struct alarm_frame_t {
     int32_t elapsed_seconds = -1;
 };
 
+constexpr size_t IMAGE_FRAME_BYTES = MATRIX_CELL_COUNT * 3;
+struct image_frame_t {
+    bool active = false;
+    // Row-major logical pixels, starting at the image's top-left corner.
+    uint8_t rgb[IMAGE_FRAME_BYTES] = {};
+};
+
 // Vitamin and player snapshots are captured under the same lock.
 size_t updatePlayerFrames(uint64_t now, player_frame_t *frames, size_t capacity,
                           vitamin_frame_t *vitamin = nullptr);
@@ -80,6 +87,9 @@ bool setClockEnabled(bool enabled);
 void updateClockFrame(clock_frame_t &frame);
 bool setAlarm(bool enabled, uint8_t hour, uint8_t minute);
 void updateAlarmFrame(alarm_frame_t &frame);
+bool setImageFrame(const uint8_t *rgb, size_t length);
+void clearImageFrame();
+void updateImageFrame(image_frame_t &frame);
 
 struct player_state_t {
     uint32_t player_id;

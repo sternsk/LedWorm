@@ -118,6 +118,16 @@ Dieses Endbild bleibt sichtbar, bis die Checkbox ausgeschaltet oder die Weckzeit
 bei aktivem Wecker geändert wird. Während des Weckermodus werden Würmer,
 Vitamine, Lauftext und analoge Uhr vollständig überdeckt.
 
+## Bildanzeige
+
+Im Controller kann eine Bilddatei ausgewählt und auf der Matrix angezeigt werden.
+Der Browser dekodiert das Bild, skaliert es auf die sichtbaren 20×16 Zellen und
+sendet 960 RGB-Bytes per `POST /api/image`. Der Upload beendet Lauftext, Uhr und
+Wecker und übernimmt die gesamte sichtbare Matrix. `DELETE /api/image` oder die
+Schaltfläche **Beenden** kehrt zur normalen Spielanzeige zurück. Alternativ kann
+ein Client bereits vorbereitete, zeilenweise von links oben angeordnete RGB-Daten
+direkt mit `Content-Type: application/octet-stream` senden.
+
 ## Vitamine und Punkte
 
 Nach drei Sekunden ohne gültige Joysticknachricht steuert der Wurm automatisch

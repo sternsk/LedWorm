@@ -24,6 +24,7 @@ static bool alarm_enabled = false;
 static uint8_t alarm_hour = 7;
 static uint8_t alarm_minute = 0;
 static time_t alarm_target = 0;
+static image_frame_t uploaded_image;
 constexpr uint64_t FIRST_VITAMIN_DELAY = 5000000;
 constexpr uint64_t VITAMIN_DELAY = 3000000;
 constexpr uint64_t AUTOPILOT_DELAY = 3000000;
@@ -184,6 +185,38 @@ bool player_manager_init() {
         playerMutex = xSemaphoreCreateMutex();
     }
     return playerMutex != nullptr;
+}
+
+bool setImageFrame(const uint8_t *rgb, size_t length) {
+    if (!rgb || length != IMAGE_FRAME_BYTES || playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
+    memcpy(uploaded_image.rgb, rgb, IMAGE_FRAME_BYTES);
+    uploaded_image.active = true;
+    // Full-screen modes are mutually exclusive. A new upload is immediately visible.
+    clock_enabled = false;
+    alarm_enabled = false;
+    alarm_target = 0;
+    if (marquee_text[0]) {
+        marquee_text[0] = '\0';
+        ++marquee_version;
+    }
+    xSemaphoreGive(playerMutex);
+    return true;
+}
+
+void clearImageFrame() {
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    uploaded_image.active = false;
+    xSemaphoreGive(playerMutex);
+}
+
+void updateImageFrame(image_frame_t &frame) {
+    frame = {};
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    frame = uploaded_image;
+    xSemaphoreGive(playerMutex);
 }
 
 bool addPlayer(int socketFd) {
@@ -350,7 +383,10 @@ bool setMarqueeText(const char *text) {
     if (xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
     memcpy(marquee_text, text, length + 1);
     ++marquee_version;
-    if (length) clock_enabled = false;
+    if (length) {
+        clock_enabled = false;
+        uploaded_image.active = false;
+    }
     xSemaphoreGive(playerMutex);
     return true;
 }
@@ -359,6 +395,7 @@ bool setClockEnabled(bool enabled) {
     if (playerMutex == nullptr ||
         xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
     clock_enabled = enabled;
+    if (enabled) uploaded_image.active = false;
     if (enabled && marquee_text[0]) {
         marquee_text[0] = '\0';
         ++marquee_version;
@@ -388,6 +425,7 @@ bool setAlarm(bool enabled, uint8_t hour, uint8_t minute) {
     if (hour > 23 || minute > 59 || playerMutex == nullptr ||
         xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
     alarm_enabled = enabled;
+    if (enabled) uploaded_image.active = false;
     alarm_hour = hour;
     alarm_minute = minute;
     alarm_target = 0;

@@ -161,7 +161,8 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
                             rgb_pixel_t ambient, const vitamin_frame_t *vitamin,
                             const marquee_frame_t *marquee,
                             const clock_frame_t *clock,
-                            const alarm_frame_t *alarm) {
+                            const alarm_frame_t *alarm,
+                            const image_frame_t *image) {
     rgb_pixel_t heads[PIXEL_COUNT] = {};
     bool occupied[PIXEL_COUNT] = {};
     rgb_pixel_t background[PIXEL_COUNT];
@@ -277,5 +278,15 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     if (alarm && alarm->active) {
         renderAlarm(frame_buffer, alarm->elapsed_seconds);
         std::copy_n(frame_buffer, PIXEL_COUNT, output_buffer);
+    }
+    if (image && image->active) {
+        for (unsigned image_y = 0; image_y < MATRIX_HEIGHT; ++image_y) {
+            const unsigned logical_y = MATRIX_HEIGHT - 1 - image_y;
+            for (unsigned x = 0; x < MATRIX_WIDTH; ++x) {
+                const size_t source = (image_y * MATRIX_WIDTH + x) * 3;
+                output_buffer[matrixPixelIndex(uint8_t(x), uint8_t(logical_y))] =
+                    {image->rgb[source], image->rgb[source + 1], image->rgb[source + 2]};
+            }
+        }
     }
 }

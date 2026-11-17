@@ -52,6 +52,43 @@ static esp_err_t select_wifi_handler(httpd_req_t *req) {
     return httpd_resp_sendstr(req, "{\"setup\":true}");
 }
 
+static esp_err_t image_upload_handler(httpd_req_t *req) {
+    if (req->content_len != IMAGE_FRAME_BYTES) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                   "Expected a 20x16 RGB image (960 bytes)");
+    }
+    uint8_t *pixels = static_cast<uint8_t *>(malloc(IMAGE_FRAME_BYTES));
+    if (!pixels) return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                            "Not enough memory for image");
+    size_t received = 0;
+    while (received < IMAGE_FRAME_BYTES) {
+        const int result = httpd_req_recv(req, reinterpret_cast<char *>(pixels + received),
+                                          IMAGE_FRAME_BYTES - received);
+        if (result == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (result <= 0) {
+            free(pixels);
+            return ESP_FAIL;
+        }
+        received += size_t(result);
+    }
+    const bool displayed = setImageFrame(pixels, IMAGE_FRAME_BYTES);
+    free(pixels);
+    if (!displayed) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Image could not be displayed");
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, "{\"displayed\":true}");
+}
+
+static esp_err_t image_clear_handler(httpd_req_t *req) {
+    clearImageFrame();
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, "{\"displayed\":false}");
+}
+
 // Only the requesting socket receives its own authoritative player snapshot.
 static esp_err_t send_player_state(httpd_req_t *req) {
     player_state_t state;
@@ -245,6 +282,16 @@ httpd_handle_t start_webserver(void) {
         selection_uri.method = HTTP_POST;
         selection_uri.handler = select_wifi_handler;
         httpd_register_uri_handler(server, &selection_uri);
+
+        httpd_uri_t image_uri = {};
+        image_uri.uri = "/api/image";
+        image_uri.method = HTTP_POST;
+        image_uri.handler = image_upload_handler;
+        httpd_register_uri_handler(server, &image_uri);
+        httpd_uri_t image_clear_uri = image_uri;
+        image_clear_uri.method = HTTP_DELETE;
+        image_clear_uri.handler = image_clear_handler;
+        httpd_register_uri_handler(server, &image_clear_uri);
 
         // Route für WebSocket
         httpd_uri_t ws_uri = {

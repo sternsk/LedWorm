@@ -230,6 +230,29 @@ static void rendering() {
     for (int i = 0; i < MAX_PLAYERS; ++i) removePlayer(10 + i);
 }
 
+static void uploadedImage() {
+    resetPlayersForTest();
+    uint8_t rgb[IMAGE_FRAME_BYTES] = {};
+    // Browser rows run top-to-bottom; logical matrix Y runs bottom-to-top.
+    rgb[0] = 11; rgb[1] = 22; rgb[2] = 33;
+    const size_t bottom_right = ((MATRIX_HEIGHT - 1) * MATRIX_WIDTH + MATRIX_WIDTH - 1) * 3;
+    rgb[bottom_right] = 44; rgb[bottom_right + 1] = 55; rgb[bottom_right + 2] = 66;
+    assert(!setImageFrame(rgb, IMAGE_FRAME_BYTES - 1));
+    assert(setImageFrame(rgb, IMAGE_FRAME_BYTES));
+    image_frame_t image;
+    updateImageFrame(image);
+    assert(image.active);
+    MatrixRenderer renderer;
+    renderer.render(nullptr, 0, {0, 0, 0}, nullptr, nullptr, nullptr, nullptr, &image);
+    auto top_left = renderer.pixels()[matrixPixelIndex(0, MATRIX_HEIGHT - 1)];
+    auto lower_right = renderer.pixels()[matrixPixelIndex(MATRIX_WIDTH - 1, 0)];
+    assert(top_left.r == 11 && top_left.g == 22 && top_left.b == 33);
+    assert(lower_right.r == 44 && lower_right.g == 55 && lower_right.b == 66);
+    clearImageFrame();
+    updateImageFrame(image);
+    assert(!image.active);
+}
+
 static void marquee() {
     resetPlayersForTest();
     marquee_frame_t frame;
@@ -748,6 +771,7 @@ int main() {
     players(); puts("PASS: 8 Spieler, Eingaben, Reconnect und parallele Zugriffe");
     resetPlayersForTest();
     rendering(); puts("PASS: Matrixmapping, mehrere Köpfe, Mischung und Fade");
+    uploadedImage(); puts("PASS: uploaded RGB image mapping and clearing");
     marquee(); puts("PASS: marquee validation, timing, centered 5x7 rendering and clearing");
     alarmRendering(); puts("PASS: alarm darkness, five-minute sun and final sunrise gradient");
     resetPlayersForTest();
