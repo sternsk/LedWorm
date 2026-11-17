@@ -181,7 +181,7 @@
                     <button type="submit" id="image-upload">Anzeigen</button>
                     <button type="button" id="image-clear">Beenden</button>
                 </div>
-                <small>Das Bild wird auf 20 × 16 Pixel skaliert.</small>
+                <small>Das Bild wird auf 16 × 16 Pixel skaliert.</small>
                 <p id="image-status" role="status" aria-live="polite"></p>
             </form>
         </div>
@@ -284,16 +284,18 @@
         async function uploadImage(file) {
             if (!file || !file.type.startsWith('image/')) throw new Error('Bitte ein Bild auswählen.');
             const bitmap = await createImageBitmap(file);
+            const width = 16;
+            const height = 16;
             try {
                 const canvas = document.createElement('canvas');
-                canvas.width = 20;
-                canvas.height = 16;
+                canvas.width = width;
+                canvas.height = height;
                 const context = canvas.getContext('2d', {alpha:false});
                 context.imageSmoothingEnabled = true;
                 context.imageSmoothingQuality = 'high';
                 context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
                 const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
-                const rgb = new Uint8Array(20 * 16 * 3);
+                const rgb = new Uint8Array(width * height * 3);
                 for (let source = 0, target = 0; source < rgba.length; source += 4) {
                     rgb[target++] = rgba[source];
                     rgb[target++] = rgba[source + 1];

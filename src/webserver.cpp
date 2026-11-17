@@ -55,7 +55,7 @@ static esp_err_t select_wifi_handler(httpd_req_t *req) {
 static esp_err_t image_upload_handler(httpd_req_t *req) {
     if (req->content_len != IMAGE_FRAME_BYTES) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                   "Expected a 20x16 RGB image (960 bytes)");
+                                   "Expected a 16x16 RGB image (768 bytes)");
     }
     uint8_t *pixels = static_cast<uint8_t *>(malloc(IMAGE_FRAME_BYTES));
     if (!pixels) return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
