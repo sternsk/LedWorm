@@ -3,6 +3,7 @@
 #include "player_manager.h"
 #include "globals.h"
 #include "wifi_manager.h"
+#include "led_effects.h"
 #include "esp_wifi.h"
 #include <stdio.h>
 #include <string.h>
@@ -19,6 +20,34 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 
 // Maximale Anzahl der HTTP-Sessions merken
 static size_t max_open_sockets = 0;
+
+static esp_err_t image_upload_handler(httpd_req_t *req) {
+    constexpr size_t frame_size = MATRIX_CELL_COUNT * 3;
+    if (req->content_len != frame_size) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                   "Expected a 20x16 RGB image");
+    }
+    uint8_t frame[frame_size];
+    size_t received = 0;
+    while (received < frame_size) {
+        const int result = httpd_req_recv(req, reinterpret_cast<char *>(frame + received),
+                                          frame_size - received);
+        if (result == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (result <= 0) return ESP_FAIL;
+        received += size_t(result);
+    }
+    if (!set_uploaded_image(frame, sizeof(frame))) return ESP_FAIL;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, "{\"displaying\":true}");
+}
+
+static esp_err_t image_clear_handler(httpd_req_t *req) {
+    clear_uploaded_image();
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, "{\"displaying\":false}");
+}
 
 static esp_err_t reset_wifi_handler(httpd_req_t *req) {
     wifi_mode_t mode;
@@ -245,6 +274,17 @@ httpd_handle_t start_webserver(void) {
         selection_uri.method = HTTP_POST;
         selection_uri.handler = select_wifi_handler;
         httpd_register_uri_handler(server, &selection_uri);
+
+        httpd_uri_t image_uri = {};
+        image_uri.uri = "/api/image";
+        image_uri.method = HTTP_POST;
+        image_uri.handler = image_upload_handler;
+        httpd_register_uri_handler(server, &image_uri);
+        httpd_uri_t image_clear_uri = image_uri;
+        image_clear_uri.uri = "/api/image/clear";
+        image_clear_uri.method = HTTP_POST;
+        image_clear_uri.handler = image_clear_handler;
+        httpd_register_uri_handler(server, &image_clear_uri);
 
         // Route für WebSocket
         httpd_uri_t ws_uri = {

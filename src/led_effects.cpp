@@ -6,10 +6,43 @@
 #include "player_manager.h"
 #include "matrix_renderer.h"
 #include "freertos/task.h"
+#include <algorithm>
 
 static const char *LED_TAG = "LED_TASK";
 static led_strip_handle_t led_strip;
 static MatrixRenderer renderer;
+static portMUX_TYPE image_mux = portMUX_INITIALIZER_UNLOCKED;
+static rgb_pixel_t uploaded_image[PIXEL_COUNT] = {};
+static bool uploaded_image_active = false;
+
+bool set_uploaded_image(const uint8_t *rgb, size_t length) {
+    if (!rgb || length != MATRIX_CELL_COUNT * 3) return false;
+    portENTER_CRITICAL(&image_mux);
+    for (unsigned row = 0; row < MATRIX_HEIGHT; ++row) {
+        for (unsigned x = 0; x < MATRIX_WIDTH; ++x) {
+            const size_t source = (size_t(row) * MATRIX_WIDTH + x) * 3;
+            uploaded_image[matrixPixelIndex(x, MATRIX_HEIGHT - 1 - row)] =
+                {rgb[source], rgb[source + 1], rgb[source + 2]};
+        }
+    }
+    uploaded_image_active = true;
+    portEXIT_CRITICAL(&image_mux);
+    return true;
+}
+
+void clear_uploaded_image() {
+    portENTER_CRITICAL(&image_mux);
+    uploaded_image_active = false;
+    portEXIT_CRITICAL(&image_mux);
+}
+
+static bool uploaded_image_snapshot(rgb_pixel_t *destination) {
+    portENTER_CRITICAL(&image_mux);
+    const bool active = uploaded_image_active;
+    if (active) std::copy_n(uploaded_image, PIXEL_COUNT, destination);
+    portEXIT_CRITICAL(&image_mux);
+    return active;
+}
 
 // Initialisierung des nativen RMT-Treibers von Espressif
 void setupLEDs() {
@@ -44,6 +77,7 @@ void led_render_task(void *) {
     const TickType_t frameTicks = pdMS_TO_TICKS(20); // 50 Frames pro Sekunde
     while (true) {
         static player_frame_t players[MAX_PLAYERS];
+        static rgb_pixel_t image_pixels[PIXEL_COUNT];
         vitamin_frame_t vitamin;
         marquee_frame_t marquee;
         clock_frame_t clock;
@@ -56,7 +90,8 @@ void led_render_task(void *) {
         renderer.render(players, count,
             {ambient_r.load(), ambient_g.load(), ambient_b.load()}, &vitamin, &marquee, &clock,
             &alarm);
-        const auto *pixels = renderer.pixels();
+        const auto *pixels = uploaded_image_snapshot(image_pixels)
+            ? image_pixels : renderer.pixels();
         for (size_t i = 0; i < PIXEL_COUNT; ++i) {
             ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, i,
                 pixels[i].r, pixels[i].g, pixels[i].b));

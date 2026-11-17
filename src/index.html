@@ -20,6 +20,8 @@
         input[type="text"] { flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #555; background: #444; color: #fff; font-size: 16px; }
         input[type="time"] { padding: 8px; border-radius: 4px; border: 1px solid #555; background: #444; color: #fff; font-size: 16px; color-scheme: dark; }
         input[type="text"]:focus { border-color: #00ffff; outline: none; }
+        #image-preview { width: 300px; max-width: 100%; aspect-ratio: 5 / 4; margin: 12px auto;
+            display: block; background: #000; border: 1px solid #555; image-rendering: pixelated; }
         
         button { background: #00ffff; color: #222; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
         button:disabled { background: #555; color: #888; cursor: not-allowed; }
@@ -175,6 +177,19 @@
             </div>
             <p id="alarm-status" role="status" aria-live="polite"></p>
         </div>
+        <div class="join-box">
+            <form id="image-form">
+                <label for="image-file">Bild auf der Matrix anzeigen:</label>
+                <input type="file" id="image-file" accept="image/*" required>
+                <canvas id="image-preview" width="20" height="16" aria-label="Vorschau"></canvas>
+                <div class="input-group">
+                    <button type="submit" id="image-send">Bild anzeigen</button>
+                    <button type="button" id="image-clear">Bild beenden</button>
+                </div>
+                <small>Das Bild wird proportional auf 20 × 16 Pixel verkleinert.</small>
+                <p id="image-status" role="status" aria-live="polite"></p>
+            </form>
+        </div>
         <div class="container status-box" id="wifi-reset-section" hidden>
             <button type="button" id="wifi-reset" disabled>WLAN zurücksetzen</button>
             <p id="wifi-action-description">Entfernt die gespeicherten WLAN-Zugangsdaten und startet LedWorm neu.</p>
@@ -265,6 +280,62 @@
         const alarmTime = document.getElementById('alarm-time');
         const alarmEnabled = document.getElementById('alarm-enabled');
         const alarmStatus = document.getElementById('alarm-status');
+        const imageForm = document.getElementById('image-form');
+        const imageFile = document.getElementById('image-file');
+        const imagePreview = document.getElementById('image-preview');
+        const imageStatus = document.getElementById('image-status');
+        const imageSend = document.getElementById('image-send');
+        const imageClear = document.getElementById('image-clear');
+
+        async function imageToRgb(file) {
+            const bitmap = await createImageBitmap(file);
+            const context = imagePreview.getContext('2d', {willReadFrequently:true});
+            context.fillStyle = '#000';
+            context.fillRect(0, 0, 20, 16);
+            const scale = Math.min(20 / bitmap.width, 16 / bitmap.height);
+            const width = Math.max(1, Math.round(bitmap.width * scale));
+            const height = Math.max(1, Math.round(bitmap.height * scale));
+            context.imageSmoothingEnabled = true;
+            context.drawImage(bitmap, Math.floor((20 - width) / 2), Math.floor((16 - height) / 2),
+                              width, height);
+            bitmap.close();
+            const rgba = context.getImageData(0, 0, 20, 16).data;
+            const rgb = new Uint8Array(20 * 16 * 3);
+            for (let source = 0, target = 0; source < rgba.length; source += 4) {
+                const alpha = rgba[source + 3] / 255;
+                rgb[target++] = Math.round(rgba[source] * alpha);
+                rgb[target++] = Math.round(rgba[source + 1] * alpha);
+                rgb[target++] = Math.round(rgba[source + 2] * alpha);
+            }
+            return rgb;
+        }
+
+        imageForm.onsubmit = async event => {
+            event.preventDefault();
+            const file = imageFile.files && imageFile.files[0];
+            if (!file) { imageStatus.textContent = 'Bitte zuerst ein Bild auswählen.'; return; }
+            imageSend.disabled = true;
+            imageStatus.textContent = 'Bild wird verarbeitet …';
+            try {
+                const rgb = await imageToRgb(file);
+                const response = await fetch('/api/image', {method:'POST',
+                    headers:{'Content-Type':'application/octet-stream'}, body:rgb});
+                if (!response.ok) throw new Error('upload failed');
+                imageStatus.textContent = 'Bild wird auf der Matrix angezeigt.';
+            } catch {
+                imageStatus.textContent = 'Bild konnte nicht angezeigt werden.';
+            } finally { imageSend.disabled = false; }
+        };
+
+        imageClear.addEventListener('click', async () => {
+            imageClear.disabled = true;
+            try {
+                const response = await fetch('/api/image/clear', {method:'POST'});
+                if (!response.ok) throw new Error('clear failed');
+                imageStatus.textContent = 'Bildanzeige beendet.';
+            } catch { imageStatus.textContent = 'Bildanzeige konnte nicht beendet werden.'; }
+            finally { imageClear.disabled = false; }
+        });
 
         function sendAlarm() {
             const match = /^(\d{2}):(\d{2})$/.exec(alarmTime.value);

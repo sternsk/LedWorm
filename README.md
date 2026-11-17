@@ -76,6 +76,12 @@ Helligkeit; `{"type":"state"}` fragt einen unveränderlichen Snapshot ab.
 stattdessen den eigenen Punktestand.
 Ein Helligkeitskommando erhält ebenfalls den bestätigten Serverzustand zurück.
 
+Im Controller kann außerdem eine Bilddatei ausgewählt werden. Der Browser
+skaliert sie unter Beibehaltung des Seitenverhältnisses auf die sichtbaren
+20×16 Pixel, füllt freie Bereiche schwarz und sendet den RGB888-Frame per
+`POST /api/image`. Das Bild ersetzt die normale Matrixausgabe, bis ein neues
+Bild gesendet oder die Anzeige mit `POST /api/image/clear` beendet wird.
+
 Das Controller-GUI besitzt außerdem ein Lauftextfeld. Eine Nachricht der Form
 `{"type":"marquee_text","text":"HELLO"}` setzt einen globalen Text mit bis zu
 32 druckbaren ASCII-Zeichen; ein leerer Text beendet ihn. Der ESP32 zeichnet
