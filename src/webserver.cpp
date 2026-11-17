@@ -5,11 +5,15 @@
 #include "wifi_manager.h"
 #include "led_effects.h"
 #include "esp_wifi.h"
+#include "esp_ota_ops.h"
+#include "esp_system.h"
+#include "freertos/task.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <cstdlib>
 #include <cmath>
+#include <algorithm>
 #include "esp_log.h"
 #include "cJSON.h" // JSON Parsing
 
@@ -20,6 +24,71 @@ extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
 
 // Maximale Anzahl der HTTP-Sessions merken
 static size_t max_open_sockets = 0;
+
+static void ota_restart_task(void *) {
+    vTaskDelay(pdMS_TO_TICKS(750));
+    esp_restart();
+}
+
+static esp_err_t ota_upload_handler(httpd_req_t *req) {
+    char confirmation[8] = {};
+    if (httpd_req_get_hdr_value_str(req, "X-LedWorm-OTA", confirmation,
+                                    sizeof(confirmation)) != ESP_OK ||
+        strcmp(confirmation, "confirm") != 0) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Confirmation missing");
+    }
+    const esp_partition_t *partition = esp_ota_get_next_update_partition(nullptr);
+    if (!partition || req->content_len <= 0 || size_t(req->content_len) > partition->size) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                   "Firmware does not fit the OTA partition");
+    }
+
+    esp_ota_handle_t handle = 0;
+    esp_err_t error = esp_ota_begin(partition, size_t(req->content_len), &handle);
+    if (error != ESP_OK) {
+        ESP_LOGE(TAG, "esp_ota_begin failed: %s", esp_err_to_name(error));
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Could not start firmware update");
+    }
+
+    uint8_t buffer[1024];
+    size_t remaining = size_t(req->content_len);
+    while (remaining > 0) {
+        const size_t wanted = std::min(remaining, sizeof(buffer));
+        const int received = httpd_req_recv(req, reinterpret_cast<char *>(buffer), wanted);
+        if (received <= 0) {
+            esp_ota_abort(handle);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                       "Firmware upload was interrupted");
+        }
+        error = esp_ota_write(handle, buffer, size_t(received));
+        if (error != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(error));
+            esp_ota_abort(handle);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                       "Could not write firmware");
+        }
+        remaining -= size_t(received);
+    }
+
+    error = esp_ota_end(handle);
+    if (error == ESP_OK) error = esp_ota_set_boot_partition(partition);
+    if (error != ESP_OK) {
+        ESP_LOGE(TAG, "OTA validation/activation failed: %s", esp_err_to_name(error));
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                   "Firmware image is invalid");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    const esp_err_t response = httpd_resp_sendstr(req, "{\"updated\":true}");
+    if (response == ESP_OK && xTaskCreate(ota_restart_task, "ota_restart", 2048, nullptr,
+                                          5, nullptr) != pdPASS) {
+        ESP_LOGE(TAG, "Could not schedule OTA restart");
+        return ESP_FAIL;
+    }
+    return response;
+}
 
 static esp_err_t image_upload_handler(httpd_req_t *req) {
     constexpr size_t frame_size = MATRIX_CELL_COUNT * 3;
@@ -285,6 +354,12 @@ httpd_handle_t start_webserver(void) {
         image_clear_uri.method = HTTP_POST;
         image_clear_uri.handler = image_clear_handler;
         httpd_register_uri_handler(server, &image_clear_uri);
+
+        httpd_uri_t ota_uri = {};
+        ota_uri.uri = "/api/ota";
+        ota_uri.method = HTTP_POST;
+        ota_uri.handler = ota_upload_handler;
+        httpd_register_uri_handler(server, &ota_uri);
 
         // Route für WebSocket
         httpd_uri_t ws_uri = {

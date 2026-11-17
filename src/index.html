@@ -195,6 +195,15 @@
             <p id="wifi-action-description">Entfernt die gespeicherten WLAN-Zugangsdaten und startet LedWorm neu.</p>
             <p id="wifi-reset-status" role="status" aria-live="polite"></p>
         </div>
+        <div class="container status-box">
+            <form id="ota-form">
+                <label for="ota-file">Firmware-Update über WLAN:</label>
+                <input type="file" id="ota-file" accept=".bin,application/octet-stream" required>
+                <button type="submit" id="ota-send" style="margin-top:12px;">Firmware installieren</button>
+                <small style="display:block; margin-top:10px;">Nur eine für dieses LedWorm-Gerät erzeugte firmware.bin verwenden.</small>
+                <p id="ota-status" role="status" aria-live="polite"></p>
+            </form>
+        </div>
     </div>
 
 
@@ -286,6 +295,29 @@
         const imageStatus = document.getElementById('image-status');
         const imageSend = document.getElementById('image-send');
         const imageClear = document.getElementById('image-clear');
+        const otaForm = document.getElementById('ota-form');
+        const otaFile = document.getElementById('ota-file');
+        const otaSend = document.getElementById('ota-send');
+        const otaStatus = document.getElementById('ota-status');
+
+        otaForm.onsubmit = async event => {
+            event.preventDefault();
+            const file = otaFile.files && otaFile.files[0];
+            if (!file) { otaStatus.textContent = 'Bitte zuerst eine firmware.bin auswählen.'; return; }
+            if (!window.confirm(`Firmware ${file.name} installieren? LedWorm startet danach neu.`)) return;
+            otaSend.disabled = true;
+            otaStatus.textContent = 'Firmware wird übertragen. Gerät nicht ausschalten …';
+            try {
+                const response = await fetch('/api/ota', {method:'POST',
+                    headers:{'Content-Type':'application/octet-stream', 'X-LedWorm-OTA':'confirm'},
+                    body:file});
+                if (!response.ok) throw new Error(await response.text());
+                otaStatus.textContent = 'Update installiert. LedWorm startet neu …';
+            } catch {
+                otaStatus.textContent = 'Firmware-Update fehlgeschlagen. Die bisherige Firmware bleibt aktiv.';
+                otaSend.disabled = false;
+            }
+        };
 
         async function imageToRgb(file) {
             const bitmap = await createImageBitmap(file);

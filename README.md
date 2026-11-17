@@ -82,6 +82,20 @@ skaliert sie unter Beibehaltung des Seitenverhältnisses auf die sichtbaren
 `POST /api/image`. Das Bild ersetzt die normale Matrixausgabe, bis ein neues
 Bild gesendet oder die Anzeige mit `POST /api/image/clear` beendet wird.
 
+## Firmware-Update über WLAN
+
+Das Controller-GUI kann eine von diesem Projekt erzeugte `firmware.bin` per
+`POST /api/ota` hochladen. Der Server verlangt zusätzlich den Header
+`X-LedWorm-OTA: confirm`, prüft die Größe gegen den inaktiven OTA-Slot und
+aktiviert das Image erst, nachdem ESP-IDF es vollständig validiert hat. Danach
+startet LedWorm automatisch neu. Ein abgebrochener oder ungültiger Upload lässt
+die bisherige Firmware aktiv.
+
+OTA benötigt die Dual-OTA-Partitionstabelle. Deshalb muss die erste Firmware
+mit dieser Funktion einmal per USB geflasht werden; spätere Updates können über
+WLAN erfolgen. Beim Build liegt die hochzuladende Datei unter
+`.pio/build/LedWorm/firmware.bin`.
+
 Das Controller-GUI besitzt außerdem ein Lauftextfeld. Eine Nachricht der Form
 `{"type":"marquee_text","text":"HELLO"}` setzt einen globalen Text mit bis zu
 32 druckbaren ASCII-Zeichen; ein leerer Text beendet ihn. Der ESP32 zeichnet
