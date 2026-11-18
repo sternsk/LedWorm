@@ -155,22 +155,21 @@ static void rendering() {
         for (size_t i = 0; i < PIXEL_COUNT; ++i) total += edge.pixels()[i].r;
         assert(total == 255);
     }
-    // Spaltenweise Verdrahtung: LED 0 ist oben links, danach geht es abwaerts.
-    assert(matrixPixelIndex(0, 15, false) == 0);
-    assert(matrixPixelIndex(0, 0, false) == 15);
-    assert(matrixPixelIndex(1, 15, false) == 16);
-    assert(matrixPixelIndex(0, 15, true) == 0);
-    assert(matrixPixelIndex(1, 0, true) == 16);
-    assert(matrixPixelIndex(1, 15, true) == 31);
-    // Die physische Spalte 15 (LEDs 240..255) ist verdeckt und wird uebersprungen.
-    assert(matrixPixelIndex(14, 15, true) == 224);
-    assert(matrixPixelIndex(14, 0, true) == 239);
-    assert(matrixPixelIndex(15, 15, true) == 256);
-    assert(matrixPixelIndex(15, 0, true) == 271);
-    assert(matrixPixelIndex(16, 0, true) == 272);
+    // Zeilenweise Verdrahtung: Logisches X laeuft auf dem Geraet horizontal.
+    assert(matrixPixelIndex(0, 15, false) == 240);
+    assert(matrixPixelIndex(0, 0, false) == 0);
+    assert(matrixPixelIndex(1, 15, false) == 241);
+    assert(matrixPixelIndex(0, 15, true) == 255);
+    assert(matrixPixelIndex(1, 0, true) == 1);
+    assert(matrixPixelIndex(1, 15, true) == 254);
+    assert(matrixPixelIndex(14, 15, true) == 241);
+    assert(matrixPixelIndex(14, 0, true) == 14);
+    assert(matrixPixelIndex(15, 15, true) == 240);
+    assert(matrixPixelIndex(15, 0, true) == 15);
     MatrixRenderer gap;
     gap.render(nullptr, 0, {20, 30, 40});
-    for (size_t i = 240; i < 256; ++i) {
+    // Unused trailing LEDs remain dark when a longer strip is configured.
+    for (size_t i = MATRIX_CELL_COUNT; i < PIXEL_COUNT; ++i) {
         assert(gap.pixels()[i].r == 0 && gap.pixels()[i].g == 0 && gap.pixels()[i].b == 0);
     }
     MatrixRenderer first, reversed;
@@ -302,6 +301,24 @@ static void marquee() {
     MatrixRenderer visible_without_overlay;
     visible_without_overlay.render(&automatic, 1, {0, 0, 0});
     assert(visible_without_overlay.pixels()[matrixPixelIndex(2, 2)].r == 63);
+
+    assert(setSnowflakeEnabled(true, 5000000));
+    snowflake_frame_t snowflake;
+    updateSnowflakeFrame(6000000, snowflake);
+    assert(snowflake.active && snowflake.elapsed_ms == 1000);
+    clock_frame_t disabled_clock;
+    updateClockFrame(disabled_clock);
+    assert(!disabled_clock.active);
+    MatrixRenderer snow_renderer;
+    snow_renderer.render(nullptr, 0, {20, 20, 20}, nullptr, nullptr, nullptr,
+                         nullptr, &snowflake);
+    unsigned snow_pixels = 0;
+    for (unsigned i = 0; i < PIXEL_COUNT; ++i) {
+        const auto pixel = snow_renderer.pixels()[i];
+        if (pixel.r || pixel.g || pixel.b) ++snow_pixels;
+    }
+    assert(snow_pixels >= 8);
+    assert(setSnowflakeEnabled(false, 0));
 }
 
 static void vitamins() {

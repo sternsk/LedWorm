@@ -82,14 +82,16 @@ void led_render_task(void *) {
         marquee_frame_t marquee;
         clock_frame_t clock;
         alarm_frame_t alarm;
+        snowflake_frame_t snowflake;
         const uint64_t now = esp_timer_get_time();
         const size_t count = updatePlayerFrames(now, players, MAX_PLAYERS, &vitamin);
         updateMarqueeFrame(now, marquee);
         updateClockFrame(clock);
         updateAlarmFrame(alarm);
+        updateSnowflakeFrame(now, snowflake);
         renderer.render(players, count,
             {ambient_r.load(), ambient_g.load(), ambient_b.load()}, &vitamin, &marquee, &clock,
-            &alarm);
+            &alarm, &snowflake);
         const auto *pixels = uploaded_image_snapshot(image_pixels)
             ? image_pixels : renderer.pixels();
         for (size_t i = 0; i < PIXEL_COUNT; ++i) {

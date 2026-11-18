@@ -20,6 +20,8 @@ static uint32_t marquee_version = 0;
 static uint32_t marquee_rendered_version = 0;
 static uint64_t marquee_started = 0;
 static bool clock_enabled = false;
+static bool snowflake_enabled = false;
+static uint64_t snowflake_started = 0;
 static bool alarm_enabled = false;
 static uint8_t alarm_hour = 7;
 static uint8_t alarm_minute = 0;
@@ -277,6 +279,8 @@ void resetPlayersForTest() {
     marquee_version = marquee_rendered_version = 0;
     marquee_started = 0;
     clock_enabled = false;
+    snowflake_enabled = false;
+    snowflake_started = 0;
     alarm_enabled = false;
     alarm_hour = 7;
     alarm_minute = 0;
@@ -350,7 +354,10 @@ bool setMarqueeText(const char *text) {
     if (xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
     memcpy(marquee_text, text, length + 1);
     ++marquee_version;
-    if (length) clock_enabled = false;
+    if (length) {
+        clock_enabled = false;
+        snowflake_enabled = false;
+    }
     xSemaphoreGive(playerMutex);
     return true;
 }
@@ -359,12 +366,41 @@ bool setClockEnabled(bool enabled) {
     if (playerMutex == nullptr ||
         xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
     clock_enabled = enabled;
+    if (enabled) snowflake_enabled = false;
     if (enabled && marquee_text[0]) {
         marquee_text[0] = '\0';
         ++marquee_version;
     }
     xSemaphoreGive(playerMutex);
     return true;
+}
+
+bool setSnowflakeEnabled(bool enabled, uint64_t now) {
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return false;
+    snowflake_enabled = enabled;
+    if (enabled) {
+        snowflake_started = now;
+        clock_enabled = false;
+        if (marquee_text[0]) {
+            marquee_text[0] = '\0';
+            ++marquee_version;
+        }
+    }
+    xSemaphoreGive(playerMutex);
+    return true;
+}
+
+void updateSnowflakeFrame(uint64_t now, snowflake_frame_t &frame) {
+    frame = {};
+    if (playerMutex == nullptr ||
+        xSemaphoreTake(playerMutex, portMAX_DELAY) != pdTRUE) return;
+    if (snowflake_enabled) {
+        if (now < snowflake_started) snowflake_started = now;
+        frame.active = true;
+        frame.elapsed_ms = uint32_t((now - snowflake_started) / 1000);
+    }
+    xSemaphoreGive(playerMutex);
 }
 
 void updateClockFrame(clock_frame_t &frame) {
@@ -476,7 +512,8 @@ bool getPlayerState(int socketFd, player_state_t &state) {
     }
     if (own) state = {own->player_id, own->worm.x_position, own->worm.y_position,
                      own->worm.length, own->worm.brightness, count, own->score,
-                     clock_enabled, alarm_enabled, alarm_hour, alarm_minute};
+                     clock_enabled, alarm_enabled, alarm_hour, alarm_minute,
+                     snowflake_enabled};
     xSemaphoreGive(playerMutex);
     return own != nullptr;
 }

@@ -167,6 +167,10 @@
                 <input type="checkbox" id="clock-enabled" disabled>
                 Uhrzeit anzeigen
             </label>
+            <label style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px;">
+                <input type="checkbox" id="snowflake-enabled" disabled>
+                Animierte Koch-Schneeflocke anzeigen
+            </label>
             <div style="display:flex; align-items:center; justify-content:center; gap:12px; margin-top:16px;">
                 <label for="alarm-time">Weckzeit:</label>
                 <input type="time" id="alarm-time" value="07:00" disabled>
@@ -277,6 +281,7 @@
         const marqueeSend = document.getElementById('marquee-send');
         const marqueeStatus = document.getElementById('marquee-status');
         const clockEnabled = document.getElementById('clock-enabled');
+        const snowflakeEnabled = document.getElementById('snowflake-enabled');
         const alarmTime = document.getElementById('alarm-time');
         const alarmEnabled = document.getElementById('alarm-enabled');
         const alarmStatus = document.getElementById('alarm-status');
@@ -364,16 +369,30 @@
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             ws.send(JSON.stringify({type:'clock', enabled:clockEnabled.checked}));
             if (clockEnabled.checked) {
+                snowflakeEnabled.checked = false;
                 marqueeText.value = '';
                 marqueeStatus.textContent = 'Analoge Uhr wird angezeigt.';
             }
         });
 
+        snowflakeEnabled.addEventListener('change', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(JSON.stringify({type:'snowflake', enabled:snowflakeEnabled.checked}));
+            if (snowflakeEnabled.checked) {
+                clockEnabled.checked = false;
+                marqueeText.value = '';
+                marqueeStatus.textContent = 'Animierte Koch-Schneeflocke wird angezeigt.';
+            }
+        });
+
         marqueeText.addEventListener('input', () => {
-            if (!clockEnabled.checked) return;
+            if (!clockEnabled.checked && !snowflakeEnabled.checked) return;
+            const clockWasEnabled = clockEnabled.checked;
             clockEnabled.checked = false;
+            snowflakeEnabled.checked = false;
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({type:'clock', enabled:false}));
+                if (clockWasEnabled) ws.send(JSON.stringify({type:'clock', enabled:false}));
+                else ws.send(JSON.stringify({type:'snowflake', enabled:false}));
             }
         });
 
@@ -404,6 +423,7 @@
                 connectionState.textContent = 'Verbunden';
                 marqueeSend.disabled = false;
                 clockEnabled.disabled = false;
+                snowflakeEnabled.disabled = false;
                 alarmTime.disabled = false;
                 alarmEnabled.disabled = false;
                 const requestState = () => {
@@ -431,6 +451,7 @@
                 wormLength.textContent = data.length;
                 wormBrightness.textContent = `${data.brightness} (${Math.round(data.brightness / 255 * 100)} %)`;
                 clockEnabled.checked = data.clock_enabled === true;
+                snowflakeEnabled.checked = data.snowflake_enabled === true;
                 alarmEnabled.checked = data.alarm_enabled === true;
                 if (Number.isInteger(data.alarm_hour) && Number.isInteger(data.alarm_minute)) {
                     alarmTime.value = `${String(data.alarm_hour).padStart(2,'0')}:${String(data.alarm_minute).padStart(2,'0')}`;
@@ -457,6 +478,7 @@
                 valueSlider.disabled = true;
                 marqueeSend.disabled = true;
                 clockEnabled.disabled = true;
+                snowflakeEnabled.disabled = true;
                 alarmTime.disabled = true;
                 alarmEnabled.disabled = true;
                 if (wifiResetComplete) {

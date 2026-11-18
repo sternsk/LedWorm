@@ -6,11 +6,25 @@
 #include <utility>
 
 size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
+    // application for 16x16-matrix
+    x = MATRIX_WIDTH - 1 - x;
+    y = MATRIX_HEIGHT - 1 - y;
+    const uint8_t row_from_top = MATRIX_HEIGHT - 1 - y;
+    const bool right_to_left = !serpentine || (row_from_top % 2) == 0;
+    const uint8_t offset = right_to_left
+        ? MATRIX_WIDTH - 1 - x
+        : x;
+
+    return size_t(row_from_top) * MATRIX_WIDTH + offset;
+    /*
+    // application for 20x16-matrix with hidden column
+
     const uint8_t physical_column = x + (x >= MATRIX_SKIPPED_COLUMN ? 1 : 0);
     // LED 0 sitzt oben links. Logisches Y waechst weiterhin von unten nach oben.
     const bool top_to_bottom = !serpentine || (physical_column % 2) == 0;
     const uint8_t offset = top_to_bottom ? MATRIX_HEIGHT - 1 - y : y;
     return size_t(physical_column) * MATRIX_HEIGHT + offset;
+    */
 }
 
 static rgb_pixel_t playerColor(uint8_t hue, uint8_t saturation, uint8_t value) {
@@ -157,11 +171,72 @@ static void renderAlarm(rgb_pixel_t *buffer, int32_t elapsed_seconds) {
     }
 }
 
+struct koch_point_t { float x, y; };
+
+static void drawKochLine(rgb_pixel_t *buffer, koch_point_t from, koch_point_t to,
+                         rgb_pixel_t color) {
+    int x0 = int(std::lround(from.x)), y0 = int(std::lround(from.y));
+    const int x1 = int(std::lround(to.x)), y1 = int(std::lround(to.y));
+    const int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    const int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int error = dx + dy;
+    for (;;) {
+        if (x0 >= 0 && x0 < MATRIX_WIDTH && y0 >= 0 && y0 < MATRIX_HEIGHT)
+            buffer[matrixPixelIndex(uint8_t(x0), uint8_t(y0))] = color;
+        if (x0 == x1 && y0 == y1) break;
+        const int twice = error * 2;
+        if (twice >= dy) { error += dy; x0 += sx; }
+        if (twice <= dx) { error += dx; y0 += sy; }
+    }
+}
+
+static void renderKochSnowflake(rgb_pixel_t *buffer, uint32_t elapsed_ms) {
+    std::fill_n(buffer, PIXEL_COUNT, rgb_pixel_t{0, 0, 0});
+    koch_point_t points[193] = {{9.5f, 15.0f}, {1.5f, 2.0f},
+                                {17.5f, 2.0f}, {9.5f, 15.0f}};
+    unsigned point_count = 4;
+    const unsigned iteration = (elapsed_ms / 2400) % 3;
+    for (unsigned level = 0; level < iteration; ++level) {
+        koch_point_t expanded[193];
+        unsigned next = 0;
+        constexpr float root3_over_6 = 0.2886751346f;
+        for (unsigned segment = 0; segment + 1 < point_count; ++segment) {
+            const auto a = points[segment], b = points[segment + 1];
+            const float dx = b.x - a.x, dy = b.y - a.y;
+            const koch_point_t one = {a.x + dx / 3.0f, a.y + dy / 3.0f};
+            const koch_point_t two = {a.x + dx * 2.0f / 3.0f, a.y + dy * 2.0f / 3.0f};
+            const koch_point_t peak = {(a.x + b.x) * 0.5f + dy * root3_over_6,
+                                       (a.y + b.y) * 0.5f - dx * root3_over_6};
+            expanded[next++] = a;
+            expanded[next++] = one;
+            expanded[next++] = peak;
+            expanded[next++] = two;
+        }
+        expanded[next++] = points[point_count - 1];
+        std::copy_n(expanded, next, points);
+        point_count = next;
+    }
+    const unsigned segment_count = point_count - 1;
+    const uint32_t within_stage = elapsed_ms % 2400;
+    const unsigned visible = std::min(segment_count,
+        1u + unsigned(uint64_t(within_stage) * segment_count / 1900));
+    const float pulse = 0.5f + 0.5f * std::sin(float(elapsed_ms) * 0.0062831853f);
+    const rgb_pixel_t color = {uint8_t(10 + 8 * pulse), uint8_t(28 + 20 * pulse),
+                               uint8_t(42 + 22 * pulse)};
+    for (unsigned segment = 0; segment < visible; ++segment)
+        drawKochLine(buffer, points[segment], points[segment + 1], color);
+    const auto tip = points[visible];
+    const int tx = int(std::lround(tip.x)), ty = int(std::lround(tip.y));
+    if (tx >= 0 && tx < MATRIX_WIDTH && ty >= 0 && ty < MATRIX_HEIGHT)
+        buffer[matrixPixelIndex(uint8_t(tx), uint8_t(ty))] = {48, 63, 63};
+}
+
 void MatrixRenderer::render(const player_frame_t *players, size_t count,
                             rgb_pixel_t ambient, const vitamin_frame_t *vitamin,
                             const marquee_frame_t *marquee,
                             const clock_frame_t *clock,
-                            const alarm_frame_t *alarm) {
+                            const alarm_frame_t *alarm,
+                            const snowflake_frame_t *snowflake) {
     rgb_pixel_t heads[PIXEL_COUNT] = {};
     bool occupied[PIXEL_COUNT] = {};
     rgb_pixel_t background[PIXEL_COUNT];
@@ -177,6 +252,7 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     for (size_t i = 0; players != nullptr && i < count; ++i) {
         const auto &player = players[i];
         const bool display_overlay = (clock && clock->active) ||
+            (snowflake && snowflake->active) ||
             (marquee && marquee->active && !marquee->initial_animation);
         if (player.automatic && display_overlay) continue;
         const auto tint = playerColor(player.hue, player.saturation, 5);
@@ -273,6 +349,10 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
         drawClockHand(output_buffer, minute.first, minute.second, {12, 12, 12});
         drawClockHand(output_buffer, second.first, second.second, {12, 12, 12});
         drawClockPixel(output_buffer, 8, 8, {12, 12, 12});
+    }
+    if (snowflake && snowflake->active) {
+        renderKochSnowflake(frame_buffer, snowflake->elapsed_ms);
+        std::copy_n(frame_buffer, PIXEL_COUNT, output_buffer);
     }
     if (alarm && alarm->active) {
         renderAlarm(frame_buffer, alarm->elapsed_seconds);

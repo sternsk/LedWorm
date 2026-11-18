@@ -40,6 +40,7 @@ assert.equal(a.nodes['worm-length'].textContent, 8);
 assert.equal(a.nodes['value-slider'].disabled, false);
 assert.equal(a.nodes['marquee-send'].disabled, false);
 assert.equal(a.nodes['clock-enabled'].disabled, false);
+assert.equal(a.nodes['snowflake-enabled'].disabled, false);
 assert.equal(a.nodes['alarm-enabled'].disabled, false);
 assert.equal(a.nodes['alarm-time'].disabled, false);
 a.nodes['alarm-time'].value = '06:45';
@@ -51,11 +52,16 @@ a.nodes['clock-enabled'].checked = true;
 a.nodes['clock-enabled'].listeners.change();
 assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
     {type:'clock',enabled:true});
+a.nodes['snowflake-enabled'].checked = true;
+a.nodes['snowflake-enabled'].listeners.change();
+assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
+    {type:'snowflake',enabled:true});
+assert.equal(a.nodes['clock-enabled'].checked, false);
 a.nodes['marquee-text'].value = 'HELLO 42!';
 a.nodes['marquee-text'].listeners.input();
 assert.equal(a.nodes['clock-enabled'].checked, false);
 assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
-    {type:'clock',enabled:false});
+    {type:'snowflake',enabled:false});
 a.nodes['marquee-form'].onsubmit({preventDefault(){}});
 assert.deepEqual(JSON.parse(JSON.stringify(a.socket.sent.at(-1))),
     {type:'marquee_text',text:'HELLO 42!'});
@@ -93,6 +99,7 @@ assert.equal(a.intervals.size, 0);
 assert.equal(a.nodes['value-slider'].disabled, true);
 assert.equal(a.nodes['marquee-send'].disabled, true);
 assert.equal(a.nodes['clock-enabled'].disabled, true);
+assert.equal(a.nodes['snowflake-enabled'].disabled, true);
 assert.equal(a.nodes['alarm-enabled'].disabled, true);
 assert.equal(a.nodes['alarm-time'].disabled, true);
 assert.equal(a.nodes['worm-score'].textContent, '–');

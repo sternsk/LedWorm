@@ -82,6 +82,13 @@ skaliert sie unter Beibehaltung des Seitenverhältnisses auf die sichtbaren
 `POST /api/image`. Das Bild ersetzt die normale Matrixausgabe, bis ein neues
 Bild gesendet oder die Anzeige mit `POST /api/image/clear` beendet wird.
 
+Die Option **Animierte Koch-Schneeflocke anzeigen** übernimmt die Matrix und
+zeichnet nacheinander die ersten drei Iterationsstufen einer Koch-Schneeflocke.
+Die Kontur wird pro Stufe schrittweise aufgebaut und pulsiert eisblau. Der Modus
+beendet Lauftext, Uhr und eine hochgeladene Bildanzeige; der Wecker behält die
+höchste Render-Priorität. Die WebSocket-Nachricht
+`{"type":"snowflake","enabled":true}` schaltet ihn ein.
+
 Das Controller-GUI besitzt außerdem ein Lauftextfeld. Eine Nachricht der Form
 `{"type":"marquee_text","text":"HELLO"}` setzt einen globalen Text mit bis zu
 32 druckbaren ASCII-Zeichen; ein leerer Text beendet ihn. Der ESP32 zeichnet
