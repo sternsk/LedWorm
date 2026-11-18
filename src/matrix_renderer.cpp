@@ -6,11 +6,25 @@
 #include <utility>
 
 size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
+    // application for 16x16-matrix
+    x = MATRIX_WIDTH - 1 - x;
+    std::swap(x, y);
+    const uint8_t row_from_top = MATRIX_HEIGHT - 1 - y;
+    const bool right_to_left = !serpentine || (row_from_top % 2) == 0;
+    const uint8_t offset = right_to_left
+        ? MATRIX_WIDTH - 1 - x
+        : x;
+
+    return size_t(row_from_top) * MATRIX_WIDTH + offset;
+    /*
+    // application for 20x16-matrix with hidden column
+
     const uint8_t physical_column = x + (x >= MATRIX_SKIPPED_COLUMN ? 1 : 0);
     // LED 0 sitzt oben links. Logisches Y waechst weiterhin von unten nach oben.
     const bool top_to_bottom = !serpentine || (physical_column % 2) == 0;
     const uint8_t offset = top_to_bottom ? MATRIX_HEIGHT - 1 - y : y;
     return size_t(physical_column) * MATRIX_HEIGHT + offset;
+    */
 }
 
 static rgb_pixel_t playerColor(uint8_t hue, uint8_t saturation, uint8_t value) {

@@ -4,7 +4,7 @@
 #include <atomic>
 
 #define LED_PIN     7
-constexpr uint8_t MATRIX_WIDTH = 20;
+constexpr uint8_t MATRIX_WIDTH = 16;
 constexpr uint8_t MATRIX_HEIGHT = 16;
 constexpr unsigned MATRIX_CELL_COUNT = MATRIX_WIDTH * MATRIX_HEIGHT;
 constexpr uint8_t MATRIX_PHYSICAL_COLUMNS = 21;
