@@ -21,8 +21,10 @@ static void network_changed(bool connected) {
 
 extern "C" void app_main(void) {
     ESP_ERROR_CHECK(player_manager_init() ? ESP_OK : ESP_ERR_NO_MEM);
+    // MatrixRenderer keeps several full-frame work buffers on this task's stack.
+    // Animated overlays add their own geometry scratch space while rendering.
     ESP_ERROR_CHECK(xTaskCreatePinnedToCore(led_render_task, "led_render_task",
-                                          4096, nullptr, 5, nullptr, 1) == pdPASS
+                                          8192, nullptr, 5, nullptr, 1) == pdPASS
                         ? ESP_OK : ESP_ERR_NO_MEM);
     ESP_ERROR_CHECK(wifi_manager_start(network_changed));
 }

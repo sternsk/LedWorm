@@ -309,15 +309,25 @@ static void marquee() {
     clock_frame_t disabled_clock;
     updateClockFrame(disabled_clock);
     assert(!disabled_clock.active);
-    MatrixRenderer snow_renderer;
-    snow_renderer.render(nullptr, 0, {20, 20, 20}, nullptr, nullptr, nullptr,
-                         nullptr, &snowflake);
-    unsigned snow_pixels = 0;
-    for (unsigned i = 0; i < PIXEL_COUNT; ++i) {
-        const auto pixel = snow_renderer.pixels()[i];
-        if (pixel.r || pixel.g || pixel.b) ++snow_pixels;
+    for (const uint64_t now : {6000000ULL, 8500000ULL, 11000000ULL}) {
+        updateSnowflakeFrame(now, snowflake);
+        MatrixRenderer snow_renderer;
+        snow_renderer.render(nullptr, 0, {20, 20, 20}, nullptr, nullptr, nullptr,
+                             nullptr, &snowflake);
+        unsigned snow_pixels = 0;
+        for (unsigned i = 0; i < PIXEL_COUNT; ++i) {
+            const auto pixel = snow_renderer.pixels()[i];
+            if (pixel.r || pixel.g || pixel.b) ++snow_pixels;
+        }
+        assert(snow_pixels >= 8);
     }
-    assert(snow_pixels >= 8);
+    updateSnowflakeFrame(7300000, snowflake);
+    MatrixRenderer centered_snow;
+    centered_snow.render(nullptr, 0, {0, 0, 0}, nullptr, nullptr, nullptr,
+                         nullptr, &snowflake);
+    assert(centered_snow.pixels()[matrixPixelIndex(8, 15)].b > 0);
+    assert(centered_snow.pixels()[matrixPixelIndex(1, 2)].b > 0);
+    assert(centered_snow.pixels()[matrixPixelIndex(15, 2)].b > 0);
     assert(setSnowflakeEnabled(false, 0));
 }
 

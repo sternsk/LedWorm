@@ -12,6 +12,10 @@ bleibt dabei erhalten, auch bei diagonalen Übergängen.
 
 In `src/globals.h` sind Abmessungen, LED-Pin und Verdrahtung festgelegt:
 
+Die normale PlatformIO-Umgebung `LedWorm` baut die Anzeige mit 180 Grad
+Rotation. Fuer das anders montierte Geraet erzeugt `LedWorm-90ccw` eine um
+90 Grad gegen den Uhrzeigersinn gedrehte Firmware (`MATRIX_ROTATION=90`).
+
 - Die LEDs laufen spaltenweise; LED 0 liegt physisch oben links, LED 1 darunter.
 - `MATRIX_SERPENTINE = true`: jede zweite physische Spalte läuft rückwärts.
 - Die physische Spalte 16 (LED-Indizes 240 bis 255) ist verdeckt, wird nicht als

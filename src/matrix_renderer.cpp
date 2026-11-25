@@ -7,8 +7,18 @@
 
 size_t matrixPixelIndex(uint8_t x, uint8_t y, bool serpentine) {
     // application for 16x16-matrix
-    x = MATRIX_WIDTH - 1 - x;
-    y = MATRIX_HEIGHT - 1 - y;
+    if constexpr (MATRIX_ROTATION_DEGREES == 90) {
+        const uint8_t original_x = x;
+        x = y;
+        y = MATRIX_HEIGHT - 1 - original_x;
+    } else if constexpr (MATRIX_ROTATION_DEGREES == 180) {
+        x = MATRIX_WIDTH - 1 - x;
+        y = MATRIX_HEIGHT - 1 - y;
+    } else if constexpr (MATRIX_ROTATION_DEGREES == 270) {
+        const uint8_t original_x = x;
+        x = MATRIX_WIDTH - 1 - y;
+        y = original_x;
+    }
     const uint8_t row_from_top = MATRIX_HEIGHT - 1 - y;
     const bool right_to_left = !serpentine || (row_from_top % 2) == 0;
     const uint8_t offset = right_to_left
@@ -192,12 +202,15 @@ static void drawKochLine(rgb_pixel_t *buffer, koch_point_t from, koch_point_t to
 
 static void renderKochSnowflake(rgb_pixel_t *buffer, uint32_t elapsed_ms) {
     std::fill_n(buffer, PIXEL_COUNT, rgb_pixel_t{0, 0, 0});
-    koch_point_t points[193] = {{9.5f, 15.0f}, {1.5f, 2.0f},
-                                {17.5f, 2.0f}, {9.5f, 15.0f}};
+    // Two subdivisions produce 3 * 4^2 segments and therefore 49 points.
+    // Keep these arrays small: this renderer runs on a 4096-byte FreeRTOS stack.
+    constexpr unsigned max_points = 49;
+    koch_point_t points[max_points] = {{7.5f, 15.0f}, {0.5f, 2.0f},
+                                       {14.5f, 2.0f}, {7.5f, 15.0f}};
     unsigned point_count = 4;
     const unsigned iteration = (elapsed_ms / 2400) % 3;
     for (unsigned level = 0; level < iteration; ++level) {
-        koch_point_t expanded[193];
+        koch_point_t expanded[max_points];
         unsigned next = 0;
         constexpr float root3_over_6 = 0.2886751346f;
         for (unsigned segment = 0; segment + 1 < point_count; ++segment) {
