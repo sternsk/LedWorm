@@ -8,3 +8,4 @@ managed_components
 CMakeLists.txt
 !src/CMakeLists.txt
 dependencies.lock
+sdkconfig.LedWorm-90ccw
