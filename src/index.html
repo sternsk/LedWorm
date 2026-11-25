@@ -396,9 +396,9 @@
 
         const christmasPoems = [
             'Advent (Rilke)', 'Knecht Ruprecht', 'Weihnachten (Eichendorff)',
-            'Das Weihnachtsbäumlein', 'Weihnachtslied (Theodor Storm)',
-            'Der Weihnachtsbaum (Robert Reinick)', 'Weihnacht (Klabund)',
-            'Weihnachtslied (Detlev von Liliencron)', 'Christnacht (Karl Henckell)',
+            'Das Weihnachtsbäumlein', 'Weihnachtslied (Storm)',
+            'Der Weihnachtsbaum (Reinick)', 'Weihnacht (Klabund)',
+            'Weihnachtslied (Liliencron)', 'Christnacht (Karl Henckell)',
             'Weihnachtslied (Karl Schwarz)', 'Einladung auf Weihnachten',
             'Zur Weihnachtszeit'
         ];
@@ -460,6 +460,7 @@
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('fetch failed');
                 const data = await response.json();
+                if (!data.parse || !data.parse.text) throw new Error('page missing');
                 const document = new DOMParser().parseFromString(data.parse.text['*'], 'text/html');
                 const poems = [...document.querySelectorAll('.poem')];
                 if (!poems.length) throw new Error('poem missing');
@@ -471,9 +472,13 @@
                 snowflakeEnabled.checked = false;
                 christmasPoemStatus.textContent = `${title} - Quelle: de.wikisource.org`;
                 showNextPoemChunk();
-            } catch {
+            } catch (error) {
                 christmasPoemEnabled.checked = false;
-                christmasPoemStatus.textContent = 'Gedicht konnte nicht von Wikisource geladen werden.';
+                christmasPoemStatus.textContent = error.message === 'page missing'
+                    ? `Wikisource-Seite "${title}" wurde nicht gefunden.`
+                    : error.message === 'poem missing'
+                        ? `Auf "${title}" wurde kein Gedichttext erkannt.`
+                        : 'Gedicht konnte nicht von Wikisource geladen werden.';
             }
         }
 
