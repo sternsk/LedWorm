@@ -171,6 +171,11 @@
                 <input type="checkbox" id="snowflake-enabled" disabled>
                 Animierte Koch-Schneeflocke anzeigen
             </label>
+            <label style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px;">
+                <input type="checkbox" id="christmas-poem-enabled" disabled>
+                Deutsches Weihnachtsgedicht des Tages
+            </label>
+            <p id="christmas-poem-status" role="status" aria-live="polite"></p>
             <div style="display:flex; align-items:center; justify-content:center; gap:12px; margin-top:16px;">
                 <label for="alarm-time">Weckzeit:</label>
                 <input type="time" id="alarm-time" value="07:00" disabled>
@@ -282,6 +287,8 @@
         const marqueeStatus = document.getElementById('marquee-status');
         const clockEnabled = document.getElementById('clock-enabled');
         const snowflakeEnabled = document.getElementById('snowflake-enabled');
+        const christmasPoemEnabled = document.getElementById('christmas-poem-enabled');
+        const christmasPoemStatus = document.getElementById('christmas-poem-status');
         const alarmTime = document.getElementById('alarm-time');
         const alarmEnabled = document.getElementById('alarm-enabled');
         const alarmStatus = document.getElementById('alarm-status');
@@ -369,6 +376,7 @@
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             ws.send(JSON.stringify({type:'clock', enabled:clockEnabled.checked}));
             if (clockEnabled.checked) {
+                stopDailyPoem(false);
                 snowflakeEnabled.checked = false;
                 marqueeText.value = '';
                 marqueeStatus.textContent = 'Analoge Uhr wird angezeigt.';
@@ -379,13 +387,107 @@
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             ws.send(JSON.stringify({type:'snowflake', enabled:snowflakeEnabled.checked}));
             if (snowflakeEnabled.checked) {
+                stopDailyPoem(false);
                 clockEnabled.checked = false;
                 marqueeText.value = '';
                 marqueeStatus.textContent = 'Animierte Koch-Schneeflocke wird angezeigt.';
             }
         });
 
+        const christmasPoems = [
+            'Advent (Rilke)', 'Knecht Ruprecht', 'Weihnachten (Eichendorff)',
+            'Das Weihnachtsbäumlein', 'Weihnachtslied (Theodor Storm)',
+            'Der Weihnachtsbaum (Robert Reinick)', 'Weihnacht (Klabund)',
+            'Weihnachtslied (Detlev von Liliencron)', 'Christnacht (Karl Henckell)',
+            'Weihnachtslied (Karl Schwarz)', 'Einladung auf Weihnachten',
+            'Zur Weihnachtszeit'
+        ];
+        let poemChunks = [], poemChunk = 0, poemTimer, poemDate = '';
+
+        function stopDailyPoem(clearDisplay) {
+            christmasPoemEnabled.checked = false;
+            clearTimeout(poemTimer);
+            if (clearDisplay && ws && ws.readyState === WebSocket.OPEN)
+                ws.send(JSON.stringify({type:'marquee_text', text:''}));
+        }
+
+        function asciiPoem(text) {
+            return text.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
+                .replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue')
+                .replace(/ß/g, 'ss').replace(/[–—]/g, '-').replace(/[„“”]/g, '"')
+                .replace(/[’‘]/g, "'").replace(/[^\x20-\x7e\n]/g, ' ')
+                .replace(/[ \t]+/g, ' ').replace(/ *\n+ */g, '\n').trim();
+        }
+
+        function splitPoem(text) {
+            const chunks = [];
+            for (const line of text.split('\n')) {
+                let current = '';
+                for (const word of line.split(' ')) {
+                    if (!word) continue;
+                    if (current && current.length + word.length + 1 > 32) {
+                        chunks.push(current); current = '';
+                    }
+                    if (word.length > 32) {
+                        if (current) { chunks.push(current); current = ''; }
+                        for (let i = 0; i < word.length; i += 32) chunks.push(word.slice(i, i + 32));
+                    } else current += (current ? ' ' : '') + word;
+                }
+                if (current) chunks.push(current);
+            }
+            return chunks;
+        }
+
+        function showNextPoemChunk() {
+            if (!christmasPoemEnabled.checked || !poemChunks.length ||
+                !ws || ws.readyState !== WebSocket.OPEN) return;
+            const text = poemChunks[poemChunk++ % poemChunks.length];
+            ws.send(JSON.stringify({type:'marquee_text', text}));
+            poemTimer = setTimeout(showNextPoemChunk, (22 + text.length * 6) * 120);
+        }
+
+        async function loadDailyPoem() {
+            clearTimeout(poemTimer);
+            const now = new Date();
+            poemDate = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+            const start = new Date(now.getFullYear(), 0, 0);
+            const day = Math.floor((now - start) / 86400000);
+            const title = christmasPoems[day % christmasPoems.length];
+            christmasPoemStatus.textContent = `Lade "${title}" von Wikisource ...`;
+            try {
+                const url = 'https://de.wikisource.org/w/api.php?action=parse&prop=text&format=json&origin=*&page=' +
+                    encodeURIComponent(title);
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('fetch failed');
+                const data = await response.json();
+                const document = new DOMParser().parseFromString(data.parse.text['*'], 'text/html');
+                const poems = [...document.querySelectorAll('.poem')];
+                if (!poems.length) throw new Error('poem missing');
+                const text = poems.map(node => node.textContent).join('\n');
+                poemChunks = splitPoem(asciiPoem(text));
+                if (!poemChunks.length) throw new Error('poem empty');
+                poemChunk = 0;
+                clockEnabled.checked = false;
+                snowflakeEnabled.checked = false;
+                christmasPoemStatus.textContent = `${title} - Quelle: de.wikisource.org`;
+                showNextPoemChunk();
+            } catch {
+                christmasPoemEnabled.checked = false;
+                christmasPoemStatus.textContent = 'Gedicht konnte nicht von Wikisource geladen werden.';
+            }
+        }
+
+        christmasPoemEnabled.addEventListener('change', () => {
+            clearTimeout(poemTimer);
+            if (christmasPoemEnabled.checked) loadDailyPoem();
+            else {
+                stopDailyPoem(true);
+                christmasPoemStatus.textContent = 'Weihnachtsgedicht beendet.';
+            }
+        });
+
         marqueeText.addEventListener('input', () => {
+            stopDailyPoem(false);
             if (!clockEnabled.checked && !snowflakeEnabled.checked) return;
             const clockWasEnabled = clockEnabled.checked;
             clockEnabled.checked = false;
@@ -411,7 +513,7 @@
             marqueeStatus.textContent = text ? 'Lauftext wird angezeigt.' : 'Lauftext wurde beendet.';
         };
         
-        let stateTimer;
+        let stateTimer, poemDateTimer;
         let haveState = false;
         let adjustingBrightness = false;
         let active = false;
@@ -424,6 +526,7 @@
                 marqueeSend.disabled = false;
                 clockEnabled.disabled = false;
                 snowflakeEnabled.disabled = false;
+                christmasPoemEnabled.disabled = false;
                 alarmTime.disabled = false;
                 alarmEnabled.disabled = false;
                 const requestState = () => {
@@ -431,6 +534,11 @@
                 };
                 requestState();
                 stateTimer = setInterval(requestState, 200);
+                poemDateTimer = setInterval(() => {
+                    const now = new Date();
+                    const today = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+                    if (christmasPoemEnabled.checked && today !== poemDate) loadDailyPoem();
+                }, 60000);
             };
             ws.onmessage = (event) => {
                 let data;
@@ -464,6 +572,8 @@
             };
             ws.onclose = () => {
                 clearInterval(stateTimer);
+                clearInterval(poemDateTimer);
+                clearTimeout(poemTimer);
                 wifiResetSection.hidden = true;
                 wifiResetButton.disabled = true;
                 haveState = false;
@@ -479,6 +589,7 @@
                 marqueeSend.disabled = true;
                 clockEnabled.disabled = true;
                 snowflakeEnabled.disabled = true;
+                christmasPoemEnabled.disabled = true;
                 alarmTime.disabled = true;
                 alarmEnabled.disabled = true;
                 if (wifiResetComplete) {

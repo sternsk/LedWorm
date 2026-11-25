@@ -93,6 +93,12 @@ beendet Lauftext, Uhr und eine hochgeladene Bildanzeige; der Wecker behält die
 höchste Render-Priorität. Die WebSocket-Nachricht
 `{"type":"snowflake","enabled":true}` schaltet ihn ein.
 
+Die Option **Deutsches Weihnachtsgedicht des Tages** lädt bei geöffnetem
+Controller täglich ein anderes gemeinfreies Gedicht über die MediaWiki-API
+von Wikisource. Umlaute werden für die 5×7-Anzeige transliteriert und der Text
+in Lauftextabschnitte aufgeteilt. Ohne geöffneten Controller findet kein Abruf
+statt.
+
 Das Controller-GUI besitzt außerdem ein Lauftextfeld. Eine Nachricht der Form
 `{"type":"marquee_text","text":"HELLO"}` setzt einen globalen Text mit bis zu
 32 druckbaren ASCII-Zeichen; ein leerer Text beendet ihn. Der ESP32 zeichnet

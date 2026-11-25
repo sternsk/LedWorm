@@ -22,7 +22,8 @@ function client(options = {}) {
         }},
         setInterval(fn) { const id = intervals.size + 1; intervals.set(id,fn); return id; },
         clearInterval(id) { intervals.delete(id); },
-        setTimeout(fn) { if (options.immediateTimers) fn(); else timeouts.push(fn); }
+        setTimeout(fn) { if (options.immediateTimers) fn(); else timeouts.push(fn); },
+        clearTimeout() {}
     });
     window.onload();
     const socket = sockets[0]; socket.onopen();
@@ -41,6 +42,7 @@ assert.equal(a.nodes['value-slider'].disabled, false);
 assert.equal(a.nodes['marquee-send'].disabled, false);
 assert.equal(a.nodes['clock-enabled'].disabled, false);
 assert.equal(a.nodes['snowflake-enabled'].disabled, false);
+assert.equal(a.nodes['christmas-poem-enabled'].disabled, false);
 assert.equal(a.nodes['alarm-enabled'].disabled, false);
 assert.equal(a.nodes['alarm-time'].disabled, false);
 a.nodes['alarm-time'].value = '06:45';
@@ -100,6 +102,7 @@ assert.equal(a.nodes['value-slider'].disabled, true);
 assert.equal(a.nodes['marquee-send'].disabled, true);
 assert.equal(a.nodes['clock-enabled'].disabled, true);
 assert.equal(a.nodes['snowflake-enabled'].disabled, true);
+assert.equal(a.nodes['christmas-poem-enabled'].disabled, true);
 assert.equal(a.nodes['alarm-enabled'].disabled, true);
 assert.equal(a.nodes['alarm-time'].disabled, true);
 assert.equal(a.nodes['worm-score'].textContent, '–');
