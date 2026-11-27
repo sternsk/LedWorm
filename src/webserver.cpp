@@ -15,6 +15,8 @@
 #include "cJSON.h" // JSON Parsing
 
 static const char *TAG = "WEB_SERVER";
+// Quotes and backslashes can each need one additional byte in JSON.
+constexpr size_t MAX_WS_FRAME_SIZE = MARQUEE_TEXT_MAX * 2 + 128;
 
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
@@ -146,7 +148,10 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         return ret;
     }
 
-    if (ws_pkt.len > 512) return ESP_ERR_INVALID_SIZE;
+    if (ws_pkt.len > MAX_WS_FRAME_SIZE) {
+        ESP_LOGW(TAG, "WebSocket-Frame zu gross: %u Bytes", unsigned(ws_pkt.len));
+        return ESP_ERR_INVALID_SIZE;
+    }
     if (ws_pkt.type != HTTPD_WS_TYPE_TEXT) return ESP_FAIL;
 
     if (ws_pkt.len > 0) {
