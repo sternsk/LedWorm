@@ -402,11 +402,10 @@
             'Weihnachtslied (Karl Schwarz)', 'Einladung auf Weihnachten',
             'Zur Weihnachtszeit'
         ];
-        let poemChunks = [], poemChunk = 0, poemTimer, poemDate = '';
+        let poemDate = '';
 
         function stopDailyPoem(clearDisplay) {
             christmasPoemEnabled.checked = false;
-            clearTimeout(poemTimer);
             if (clearDisplay && ws && ws.readyState === WebSocket.OPEN)
                 ws.send(JSON.stringify({type:'marquee_text', text:''}));
         }
@@ -416,38 +415,10 @@
                 .replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue')
                 .replace(/ß/g, 'ss').replace(/[–—]/g, '-').replace(/[„“”]/g, '"')
                 .replace(/[’‘]/g, "'").replace(/[^\x20-\x7e\n]/g, ' ')
-                .replace(/[ \t]+/g, ' ').replace(/ *\n+ */g, '\n').trim();
-        }
-
-        function splitPoem(text) {
-            const chunks = [];
-            for (const line of text.split('\n')) {
-                let current = '';
-                for (const word of line.split(' ')) {
-                    if (!word) continue;
-                    if (current && current.length + word.length + 1 > 32) {
-                        chunks.push(current); current = '';
-                    }
-                    if (word.length > 32) {
-                        if (current) { chunks.push(current); current = ''; }
-                        for (let i = 0; i < word.length; i += 32) chunks.push(word.slice(i, i + 32));
-                    } else current += (current ? ' ' : '') + word;
-                }
-                if (current) chunks.push(current);
-            }
-            return chunks;
-        }
-
-        function showNextPoemChunk() {
-            if (!christmasPoemEnabled.checked || !poemChunks.length ||
-                !ws || ws.readyState !== WebSocket.OPEN) return;
-            const text = poemChunks[poemChunk++ % poemChunks.length];
-            ws.send(JSON.stringify({type:'marquee_text', text}));
-            poemTimer = setTimeout(showNextPoemChunk, (22 + text.length * 6) * 120);
+                .replace(/\s+/g, ' ').trim();
         }
 
         async function loadDailyPoem() {
-            clearTimeout(poemTimer);
             const now = new Date();
             poemDate = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
             const start = new Date(now.getFullYear(), 0, 0);
@@ -464,26 +435,26 @@
                 const document = new DOMParser().parseFromString(data.parse.text['*'], 'text/html');
                 const poems = [...document.querySelectorAll('.poem')];
                 if (!poems.length) throw new Error('poem missing');
-                const text = poems.map(node => node.textContent).join('\n');
-                poemChunks = splitPoem(asciiPoem(text));
-                if (!poemChunks.length) throw new Error('poem empty');
-                poemChunk = 0;
+                const text = asciiPoem(poems.map(node => node.textContent).join('\n'));
+                if (!text) throw new Error('poem empty');
+                if (text.length > 4096) throw new Error('poem too long');
                 clockEnabled.checked = false;
                 snowflakeEnabled.checked = false;
                 christmasPoemStatus.textContent = `${title} - Quelle: de.wikisource.org`;
-                showNextPoemChunk();
+                ws.send(JSON.stringify({type:'marquee_text', text}));
             } catch (error) {
                 christmasPoemEnabled.checked = false;
                 christmasPoemStatus.textContent = error.message === 'page missing'
                     ? `Wikisource-Seite "${title}" wurde nicht gefunden.`
                     : error.message === 'poem missing'
                         ? `Auf "${title}" wurde kein Gedichttext erkannt.`
+                        : error.message === 'poem too long'
+                            ? `"${title}" ist zu lang für den Gedichtpuffer.`
                         : 'Gedicht konnte nicht von Wikisource geladen werden.';
             }
         }
 
         christmasPoemEnabled.addEventListener('change', () => {
-            clearTimeout(poemTimer);
             if (christmasPoemEnabled.checked) loadDailyPoem();
             else {
                 stopDailyPoem(true);
@@ -578,7 +549,6 @@
             ws.onclose = () => {
                 clearInterval(stateTimer);
                 clearInterval(poemDateTimer);
-                clearTimeout(poemTimer);
                 wifiResetSection.hidden = true;
                 wifiResetButton.disabled = true;
                 haveState = false;

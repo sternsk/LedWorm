@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include <utility>
 #include <cstring>
+#include <string>
 
 static void movement() {
     LedWorm tuned;
@@ -241,7 +242,12 @@ static void marquee() {
     updateMarqueeFrame(1000000 + uint64_t(travel) * 120000, frame);
     assert(frame.x == MATRIX_WIDTH);
     assert(!setMarqueeText("Gr\xc3\xbc\xc3\x9f"));
-    assert(!setMarqueeText("123456789012345678901234567890123"));
+    std::string oversized_marquee(MARQUEE_TEXT_MAX + 1, 'X');
+    assert(!setMarqueeText(oversized_marquee.c_str()));
+    std::string long_marquee(512, 'X');
+    assert(setMarqueeText(long_marquee.c_str()));
+    updateMarqueeFrame(1500000, frame);
+    assert(frame.active && strlen(frame.text) == long_marquee.size());
 
     assert(setMarqueeText("H"));
     updateMarqueeFrame(2000000, frame);

@@ -95,8 +95,9 @@ höchste Render-Priorität. Die WebSocket-Nachricht
 
 Die Option **Deutsches Weihnachtsgedicht des Tages** lädt bei geöffnetem
 Controller täglich ein anderes gemeinfreies Gedicht über die MediaWiki-API
-von Wikisource. Umlaute werden für die 5×7-Anzeige transliteriert und der Text
-in Lauftextabschnitte aufgeteilt. Ohne geöffneten Controller findet kein Abruf
+von Wikisource. Umlaute werden für die 5×7-Anzeige transliteriert und das
+vollständige Gedicht bis 4096 Zeichen als durchgehender Lauftext gepuffert.
+Ohne geöffneten Controller findet kein Abruf
 statt.
 
 Das Controller-GUI besitzt außerdem ein Lauftextfeld. Eine Nachricht der Form

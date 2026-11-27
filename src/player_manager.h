@@ -51,7 +51,9 @@ struct vitamin_frame_t {
     uint64_t age_us = 0;
 };
 
-constexpr size_t MARQUEE_TEXT_MAX = 32;
+// Complete daily poems fit here. The render task keeps its frame in static
+// storage so this buffer does not consume FreeRTOS stack space.
+constexpr size_t MARQUEE_TEXT_MAX = 4096;
 struct marquee_frame_t {
     bool active = false;
     bool initial_animation = false;

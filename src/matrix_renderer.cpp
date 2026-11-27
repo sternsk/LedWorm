@@ -327,7 +327,15 @@ void MatrixRenderer::render(const player_frame_t *players, size_t count,
     }
     if (marquee && marquee->active) {
         const size_t length = strnlen(marquee->text, MARQUEE_TEXT_MAX);
-        for (size_t character = 0; character < length; ++character) {
+        size_t first = 0;
+        if (marquee->x + 4 < 0)
+            first = size_t((-int(marquee->x) - 4 + 5) / 6);
+        size_t last = length;
+        if (marquee->x <= MATRIX_WIDTH - 1)
+            last = std::min(length, size_t((MATRIX_WIDTH - 1 - marquee->x) / 6 + 1));
+        else
+            last = 0;
+        for (size_t character = first; character < last; ++character) {
             for (unsigned column = 0; column < 5; ++column) {
                 const int x = marquee->x + int(character * 6 + column);
                 if (x < 0 || x >= MATRIX_WIDTH) continue;

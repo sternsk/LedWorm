@@ -79,7 +79,7 @@ void led_render_task(void *) {
         static player_frame_t players[MAX_PLAYERS];
         static rgb_pixel_t image_pixels[PIXEL_COUNT];
         vitamin_frame_t vitamin;
-        marquee_frame_t marquee;
+        static marquee_frame_t marquee;
         clock_frame_t clock;
         alarm_frame_t alarm;
         snowflake_frame_t snowflake;
